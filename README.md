@@ -17,9 +17,12 @@ scripts/multiome-processing.R -h
 ```
 As the output indicates, the scripts excepts 2 mandatory arguments: pipeline(s) and samplesheet.  
 The example samplesheet shows what a decent samplesheet looks like:
-```
-head /example-data/samplesheet.csv
-```
+
+|sampleName|path|cond|
+|---|---|---|
+|ctrl.1|/gpfs/data/sequence/results/naiklab/2023-03-24/cellranger/count-CTRL/outs|ctrl|
+|il17.1|/gpfs/data/sequence/results/naiklab/2023-03-24/cellranger/count-IL-17/outs|il17a|
+
 
 
 
