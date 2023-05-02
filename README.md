@@ -1,4 +1,4 @@
-## scMulitome Analyiss Pipeline
+## scMulitome Analysis Pipeline
 #### Naik Lab
 ##### Joseph Daccache (05/02/2023)
 This github repo contains the necessary scripts to run the scmultiome wrapper functions.  
@@ -16,5 +16,10 @@ In short,
 scripts/multiome-processing.R -h
 ```
 As the output indicates, the scripts excepts 2 mandatory arguments: pipeline(s) and samplesheet.  
+The example samplesheet shows what a decent samplesheet looks like:
+```
+head /example-data/samplesheet.csv
+```
+
 
 
