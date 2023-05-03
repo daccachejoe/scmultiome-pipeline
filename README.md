@@ -58,7 +58,7 @@ optional arguments:
                          [default: FALSE]
   -f, --footprint-peaks  atac peaks to run footprinting analysis on.
                          txt file
-  -m, --my.macs2.path    path to macs2 environment. only used if
+  -m, --my.macs.path     path to macs environment. only used if
                          callpaks pipeline is run
 ```
 As the output indicates, the scripts excepts 2 mandatory arguments: pipeline(s) and samplesheet.  
