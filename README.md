@@ -15,12 +15,31 @@ source install.sh
 
 Let's test the installation by running our tester file and looking for the help message
 ```
-test.R -h
+./test.R -h
+```
+```
+usage: test.R [--] [--help] [--opts OPTS] [--digits DIGITS] number
+
+Round a floating point number
+
+positional arguments:
+  number        number to round
+
+flags:
+  -h, --help    show this help message and exit
+
+optional arguments:
+  -x, --opts    RDS file containing argument values
+  -d, --digits  number of decimal places [default: 0]
 ```
 Now let's see if the script can take in arguments and perform the expected tasks
 ```
-test.R 3.14159 
-test.R 3.14159 -d 2
+./test.R 3.14159 
+./test.R 3.14159 -d 2
+```
+```
+3 
+3.14
 ```
 
 ### Running our scMulitome pipeline
