@@ -1,0 +1,360 @@
+#!/usr/bin/env Rscript
+
+# This is the master R script that will mimick the R markdown tester file 'sc-mulit-organoid-psor-001.Rmd'
+# it will only factor in a few arguments, depending on stage of pipline
+library(argparser, quietly=TRUE)
+
+# Create a parser
+p <- arg_parser("Run single-cell RNA + ATAC Multiomic Analysis from 10X Genomics platform")
+
+# Add required command line arguments
+p <- add_argument(p, "pipeline", 
+                help="Comma delimted combinations of: init, create, callpeaks, qc, cluster, merge, linkpeaks", 
+                type="character")
+p <- add_argument(p, "samplesheet", help="samplesheet in csv format", type="character")
+
+# Add optional command line flags
+p <- add_argument(p, "--outfilename", help="outfile name, no .RDS!", type="character",
+     default="data/r-objects/multiome-object")
+p <- add_argument(p, "--grouping.var", help="grouping variable for peak calling algorithm", type = "character", default="NA")
+p <- add_argument(p, "--RDS.file.in", help="RDS in-file for the pipeline desired", default="NA")
+p <- add_argument(p, "--RunHarmony",flag=TRUE, help="Run Harmony batch correction")
+p <- add_argument(p, "--footprint-peaks", help="atac peaks to run footprinting analysis on. txt file", type="character")
+p <- add_argument(p, "--my.macs.path", help="path to macs environment. only used if callpaks pipeline is run", type="character")
+p <- add_argument(p, "--qc.sheet", help="path to csv file containing clusters to remove per sample", type="character")
+
+# Parse the command line arguments
+argv <- parse_args(p)
+
+pipelines.to.run <- unlist(strsplit(argv$pipeline, split = ","))
+samplesheet <- argv$samplesheet
+
+library(future, quietly=TRUE)
+library(future.apply, quietly=TRUE)
+
+options(future.globals.maxSize = Inf)
+options(future.rng.onMisuse = "ignore")
+# options(future.globals.maxSize = 400000*1024^2)
+# options$future.globals.maxSize
+# parrallelize the processing
+plan(multicore, workers = as.numeric(future::availableCores()))
+plan()
+
+typeof(argv$RunHarmony)
+
+# set up and load in R libraries needed for analysis
+library(Seurat, quietly=TRUE)
+library(Signac, quietly=TRUE)
+library(EnsDb.Hsapiens.v86, quietly=TRUE)
+library(dplyr, quietly=TRUE)
+library(ggplot2, quietly=TRUE)
+library(enrichR, quietly=TRUE)
+
+# source in wrapper functions
+source("scripts/functions.R")
+
+# being processing
+# always read in the samplesheet for referemnce
+samplesheet <- read.csv(samplesheet)
+samples <- samplesheet$sampleName
+
+# load in annotation files for peaks and ranges
+my.annotation <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
+seqlevelsStyle(my.annotation) <- "UCSC"
+peak.genome <- BSgenome.Hsapiens.NCBI.GRCh38::BSgenome.Hsapiens.NCBI.GRCh38
+seqlevelsStyle(peak.genome) <- "UCSC"
+
+# load in data if desired
+if(!(argv$RDS.file.in == "NA")){
+    message("Loading in: ", argv$RDS.file.in)
+    obj.list <- readRDS(argv$RDS.file.in)
+    if(class(obj.list) != "list"){
+        obj.list <- list(obj.list)
+    }
+}
+
+# intitial run combines directories into local directory structure
+if("init" %in% pipelines.to.run){
+    message("Begining scMulitome processing")
+    lapply(samples, 
+            function(sample){
+            data.dir <- samplesheet$path[samplesheet$sampleName == sample]
+            new.dir <- paste0("data/raw/", sample)
+            CombineDirectories(data.dir, new.dir, sample)
+    })
+}
+
+# pipeline to create the seurat objects for each instance in the samplesheet
+if("create" %in% pipelines.to.run){
+    obj.list <- 
+        lapply(samples, 
+            function(sample){
+                # create objects
+                seu <- CreateMultiomeSeurat(data.dir = paste0("data/raw/",sample))
+                
+                seu@project.name <- sample
+                seu$orig.ident <- sample    
+                # adding meta data columns to seurat object
+                path.col <- grep("path", colnames(samplesheet))
+                if(path.col < ncol(samplesheet)){
+                    for(md.col.to.add in colnames(samplesheet)[c((path.col+1):ncol(samplesheet))]){
+                        seu[[paste0(md.col.to.add)]] <- 
+                            samplesheet[,md.col.to.add][samplesheet$sampleName == sample]
+                    }
+                }
+                # assay-specific metrics
+                seu[["percent.mt"]] <- PercentageFeatureSet(seu, pattern = "^MT-")
+                seu <- NucleosomeSignal(seu, assay = "ATAC")
+                seu <- TSSEnrichment(seu, assay = "ATAC")
+                return(seu)
+            })
+    names(obj.list) <- samples
+    saveRDS(obj.list, file = paste0(argv$outfilename, "-create-obj-list.RDS"))
+}
+
+# pipeline to call our own peaks using MACS2
+if("callpeaks" %in% pipelines.to.run){
+    obj.list <- 
+        lapply(obj.list, 
+            function(obj){
+                if(argv$grouping.var == "NA"){
+                    # obj <- CallMyPeaks(obj)
+                    obj <- CallMyPeaks(obj, my.macs2.path=argv$my.macs.path)
+                } else {
+                    # obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var)
+                    obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var, my.macs2.path=argv$my.macs.path)
+                } 
+                return(obj)
+            })
+    saveRDS(obj.list, file = paste0(argv$outfilename, "-callpeaks-obj-list.RDS"))
+}
+
+# quality control plots and clustering for each object individually
+# no subsetting is done in this pipeline, must be done manually (for now)
+if("qc" %in% pipelines.to.run){
+
+    pdf(file = paste0(date.time.append(str = "output/qc-plots-obj-list"), ".pdf"),
+        height = 8, width = 12)
+    list.of.vars <- list("1" = c("nCount_RNA",  "nCount_ATAC"),
+                     "2" = c("nFeature_RNA","nFeature_ATAC"),
+                     "3" = "percent.mt",
+                     "4" = c("nucleosome_signal" ,"TSS.enrichment"))
+    p.list <-
+        lapply(list.of.vars, function(vars.to.plot){
+            p <- 
+                bind_rows(lapply(obj.list, function(seu){return(seu@meta.data)})) %>%
+                    dplyr::select(orig.ident, all_of(vars.to.plot)) %>%
+                    reshape2::melt() %>%
+                    ggplot(aes(x = orig.ident, y = value, fill = orig.ident)) +
+                    geom_violin() +
+                    facet_grid(~variable) +
+                    scale_fill_manual(values = c("#F7BE9F", "#EA7580")) +
+                    theme_classic() +
+                    theme(axis.text = element_text(color = "black"))
+                    if(!("percent.mt" %in% vars.to.plot | "nucleosome_signal" %in% vars.to.plot)){
+                        p <- p +scale_y_log10() 
+                    }
+        return(p)
+    })
+    print(p.list)
+
+    # preprocessing
+    obj.list <- lapply(obj.list,
+    function(seu){
+        DefaultAssay(seu) <- "RNA"
+        seu <- SCTransform(seu)
+        seu <-   
+            seu %>%
+            RunPCA() %>%
+            FindNeighbors() %>%
+            FindClusters()
+        return(seu)
+    })
+
+    p.list.2 <- 
+        lapply(obj.list, 
+            function(seu){
+            p <- VlnPlot(seu, 
+                pt.size = 0, 
+                features = unlist(list.of.vars), 
+                group.by = "seurat_clusters",
+                stack = T, 
+                fill.by = "ident", 
+                log = T) + 
+                NoLegend() +
+                ggtitle(seu@project.name)
+            return(p)
+            })
+    print(p.list.2)
+    dev.off()
+
+    saveRDS(obj.list, file = paste0(argv$outfilename, "-qc-obj-list.RDS"))
+}
+
+# fitler objects based on qc output and user input
+if("filter" %in% pipelines.to.run){
+    message("Running Filtering Pipeline")
+    qc.df <- read.csv(file = argv$qc.sheet)
+    obj.list <- 
+        lapply(obj.list,
+            function(seu){
+                clus.to.remove <- as.character(qc.df$cluster.to.remove[which(seu@project.name == qc.df$sampleName)])
+                clus.to.remove <- as.numeric(unlist(strsplit(clus.to.remove, split = ";")))
+                seu <- subset(seu, seurat_clusters %in% clus.to.remove, invert = TRUE)
+                return(seu)
+            })
+}
+
+# construct WNN graphs 
+if("cluster" %in% pipelines.to.run){
+    message("Running Clustering Pipeline")
+    obj.list <- 
+        lapply(obj.list, 
+            function(obj){
+                obj <- Preprocess.and.Reduce.Dims(obj, 
+                                                harmony = argv$RunHarmony)
+                obj <- ConstructWNNGraph(obj, 
+                                        harmony = argv$RunHarmony,
+                                        resolution = seq(0,1,0.1))
+                return(obj)
+            })
+    saveRDS(obj.list, file = paste0(argv$outfilename, "-cluster-obj-list.RDS"))
+}
+
+# merge objects and create conserved peaks across objects
+if("merge" %in% pipelines.to.run){
+    message("Running Merging Pipeline")
+    # peak paths
+    peak.paths <- paste(
+        samplesheet$path,
+        "atac_peaks.bed",
+        sep = "/"
+    )
+
+    # peak list
+    peak.list <- lapply(peak.paths, rtracklayer::import)
+    names(peak.list) <- samplesheet$sampleName
+    peak.list <- lapply(peak.list, function(peak.object){
+                peak.object <- keepStandardChromosomes(peak.object, pruning.mode="coarse")
+                return(peak.object)
+        })
+
+    # intersecting the peak list
+    combined.peaks <- reduce(unlist(GRangesList(peak.list)))
+
+    # Filter out bad peaks based on length
+    peakwidths <- width(combined.peaks)
+    combined.peaks <- combined.peaks[peakwidths  < 10000 & peakwidths > 20]
+
+    frag.paths <- lapply(obj.list, function(seu){
+        assay.to.use <- "ATAC"
+        if(!(assay.to.use %in% names(seu@assays))){
+            assay.to.use <- "peaks"
+        }
+        frag.path <- seu@assays[[assay.to.use]]@fragments[[1]]@path
+        return(frag.path)
+    })
+
+    # done post-qc so we know which cells to keep already
+    frag.list <- lapply(names(frag.paths),function(f.path.name){
+        f.path <- frag.paths[[f.path.name]]
+        cells.to.keep <- colnames(obj.list[[f.path.name]])
+        frag.obj <- 
+            CreateFragmentObject(path = f.path, cells = cells.to.keep)
+        return(frag.obj)
+    })
+    names(frag.list) <- names(frag.paths)
+
+    # feature-matrix generation for peaks assay
+    feat.mat.list <- lapply(names(frag.paths),function(f.path.name){
+        f.path <- frag.paths[[f.path.name]]
+        cells.to.keep <- colnames(obj.list[[f.path.name]])
+        frag.obj <- frag.list[[f.path.name]]
+        frag.matrix <- 
+            FeatureMatrix(fragments = frag.obj,
+                        features = combined.peaks,
+                        cells = colnames(obj.list[[f.path.name]]))
+        return(frag.matrix)
+    })
+    names(feat.mat.list) <- names(frag.paths)
+    
+    # re-create the peaks assay using the new counts
+    obj.list <- lapply(names(frag.paths),function(f.path.name){
+        seu <- obj.list[[f.path.name]]
+        DefaultAssay(seu) <- "RNA"
+        seu <- DietSeurat(seu, assays = c("RNA", "SCT"))
+        seu[["peaks"]] <- 
+            CreateChromatinAssay(
+                    counts = feat.mat.list[[f.path.name]], 
+                    fragments = frag.list[[f.path.name]], 
+                    annotation = my.annotation)
+        return(seu)
+    })
+
+    # merge the objects now with a combined peaks set
+    if(length(obj.list) == 2){
+        merged.obj <- merge(obj.list[[1]], obj.list[[2]])
+    } else {
+        merged.obj <- merge(obj.list[[1]], obj.list[c(2:length(obj.list))])
+    }
+    
+    # rerun the clustering on the merged object
+    if(argv$RunHarmony){
+        message("RunHarmony flagged as TRUE")
+        my.harmony.vars <- "orig.ident"
+    } else {
+        message("RunHarmony flagged as not TRUE")
+        my.harmony.vars <- NULL
+    }
+    merged.obj <- Preprocess.and.Reduce.Dims(merged.obj, 
+        harmony = argv$RunHarmony,
+        harmony.vars = my.harmony.vars,
+        vars.to.regress = NULL)
+    merged.obj <- ConstructWNNGraph(merged.obj, 
+                                    harmony = argv$RunHarmony, 
+                                    resolution = 0.3)
+    merged.obj <- list(merged.obj)
+    saveRDS(merged.obj, file = paste0(argv$outfilename, "-merged-obj-list.RDS"))
+}
+
+# link peaks to genes
+if("linkpeaks" %in% pipelines.to.run){
+    obj.list <- 
+        lapply(obj.list,
+            function(obj){
+                    Idents(obj) <- argv$grouping.var
+                    DefaultAssay(obj) <- "SCT"
+                    obj <- PrepSCTFindMarkers(obj)
+                    M <- FindAllMarkers(obj,
+                                        only.pos = TRUE)
+                    write.csv(M, file = paste0("output/de-genes-",argv$grouping.var,".csv"), row.names = T)
+
+                    genes.to.link <- M %>% filter(p_val_adj < 0.1) %>% arrange(cluster, desc(avg_log2FC)) %>% pull(gene)
+                    obj <- LinkMyPeaks(obj,
+                                        genes = genes.to.link,
+                                        distance.to.use = 2e6,
+                                        peak.genome = peak.genome)
+                    return(obj)
+            })
+    saveRDS(obj.list, file = paste0(argv$outfilename, "-linked-obj-list.RDS"))
+}
+
+# footprinting TF activity by motifs
+if("footprint" %in% pipelines.to.run){
+    library(motifmatchr, quietly=TRUE)
+    library(TFBSTools, quietly=TRUE)
+    library(JASPAR2020, quietly=TRUE)
+
+    peaks.to.footprint <- readr::read_delim(argv$footprint-peaks, rownames = F)
+    footprint.list <- 
+        lapply(obj.list,
+            function(obj){
+                footprint.obj <- 
+                    FootprintMyPeaks(obj, 
+                        peaks.to.test = peaks.to.footprint,
+                        peak.genome = peak.genome)
+            })
+    saveRDS(obfootprintj.list, file = paste0(argv$outfilename, "-footprinted-obj-list.RDS"))
+}
+
+message("disco complete.")
