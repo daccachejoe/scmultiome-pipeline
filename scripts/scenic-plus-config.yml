@@ -1,0 +1,25 @@
+compute_topics: true
+enhancer_iden: true
+pycisTarget: false
+scenicplus: false
+scenicplus_downstream: false
+load_objects: false
+
+data_path: ./data # path to the data directory (default is ./data)
+input_path: ./data/raw # path to the input data directory (default is ./data/raw)
+output_path: ./output # path to the output directory (default is ./output)
+tmp_dir_path: ./gpfs/scratch/your_username # path to the tmpDir directory (default is ./gpfs/scratch/your_username/tmpDir)
+cistarget_db_path: .data/cisTargetDB # path to the cisTargetDBs directory (default is ./data/cisTargetDBs)
+
+rna_h5ad_name: rna.h5ad # rna file .h5ad file name (default is rna.h5ad)
+atac_txt_name: atac.txt # atac matrix .txt file name (default is atac.txt)
+cell_metadata_name: metadata.txt # cell metadata .txt file name (default is metadata.txt)
+pca_name: pca.txt # PCA 1 and 2 dims text file name (default is pca.txt)
+
+tmp_dir_path: "path to the tmpDir directory" # ./gpfs/scratch/your_username/tmpDir
+db_fpath: "path to the cisTargetDBs directory" # ./data/cisTargetDBs
+
+grouping_var: "meta data column to group cells by" # text column
+
+nTopics: NA # if not NA, will use the number of topics specified here instead of auto generated
+cpus: 4
