@@ -10,6 +10,12 @@ In the directory of your choosing, clone this repository, rename it as your desi
 git clone https://github.com/jad362/scmultiome-pipeline.git
 mv scmultiome-pipeline {project_name}
 cd {project_name}
+
+# load R in whichever way is easiest for you, on an HPC, using module load is best
+module load r
+
+# make the master script executable
+chmod +x runmultiome.sh
 runmultiome.sh init
 ```
 
