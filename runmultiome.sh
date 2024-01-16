@@ -1,5 +1,3 @@
-#!/bin/bash
-
 export my_macs_path=/gpfs/data/naiklab/jd5457/opt/MACS/bin/macs3
 export project_prefix=multiome-control-skin
 export personal_anaconda_path=/gpfs/data/ruggleslab/jd5457/miniconda/miniconda/etc/profile.d/conda.sh
@@ -9,14 +7,6 @@ export scenicplus_env_name=scenicplus
 export create_cistarget_databases_env_name=create_cistarget_databases
 export create_cistarget_databases_dir=/gpfs/home/jd5457/.conda/envs/create_cisTarget_databases/
 
-
-# Check if the argument is provided
-if [ $# -eq 0 ]; then
-    echo "Please provide an argument to specify which chunk of code to run."
-    exit 1
-fi
-
-# Define the code chunks
 init() {
     echo "Initializing environment"
     bash routes/setup_dirs.sh
@@ -53,18 +43,16 @@ run_scenicplus() {
     sbatch -p gpu8_medium --mem 300GB -o scripts/outs/scenicplus-%J.out -t 0-23:00:00 --export=ALL  routes/run_scenicplus.sh
 }
 
-# Run the specified chunk based on the argument
-eval "$1"
+run_multiome() {
+    # Check if the argument is provided
+    if [ $# -eq 0 ]; then
+        echo "Please provide an argument to specify which function to run."
+        exit 1
+    fi
 
-#!/bin/sh
-# high memory configuration
-#SBATCH --partition gpu8_medium
-##SBATCH --partition gpu4_short
-#SBATCH --nodes 1
-#SBATCH --ntasks-per-node 32
-##SBATCH --mem 600GB
-#SBATCH --mem 300GB
-#SBATCH --time 0-12:00:00
-#SBATCH --job-name jup-SCENIC
-#SBATCH --output scripts/outs/scenicplus-%J.log
-#SBATCH --error scripts/outs/scenicplus-%J.e 
+    # Run the specified function based on the argument
+    "$1"
+}
+
+# # Call the run_multiome function with the provided argument
+# run_multiome "$1"
