@@ -1,27 +1,17 @@
 ## scMulitome Analysis Pipeline
 #### Naik Lab
-##### Joseph Daccache (01/16/2024)
-This github repo contains the necessary scripts to run sc multiome (expected 10X Genomics output) entirely from BASH.  
-The pipeline incorporates _Seurat_, _Signac_, and _SCENIC+_ analytical workflows  
+##### Joseph Daccache (05/02/2023)
+This github repo contains the necessary scripts to run the scmultiome wrapper functions.  
+In order for the pipeline to work, the user must alllow for R scripts to be executed as typical command line functions.  
 
 ### Installation
-In the directory of your choosing, clone this repository, rename it as your desired project directory, and run the `init` command to set up your directories and confugre your wrapper scripts.
+In the directory of your choosing, clone this repository and source the `install.sh` file  
+example installation:
 ```
-git clone https://github.com/jad362/scmultiome-pipeline.git
-mv scmultiome-pipeline {project_name}
-cd {project_name}
-
-# load R in whichever way is easiest for you, on an HPC, using module load is best
-module load r
-
-# make the master script executable
-chmod +x runmultiome.sh
-runmultiome.sh init
+git clone https://github.com/jad362/scmultiome-wrappers.git
+cd scmultiome-wrappers
+source install.sh
 ```
-
-
-
-
 
 Let's test the installation by running our tester file and looking for the help message
 ```
