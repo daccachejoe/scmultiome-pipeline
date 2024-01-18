@@ -14,7 +14,7 @@ p <- add_argument(p, "pipeline",
 p <- add_argument(p, "samplesheet", help="samplesheet in csv format", type="character")
 
 # Add optional command line flags
-p <- add_argument(p, "--project-prefix", help="outfile name, no .RDS!", type="character", default="multiome")
+p <- add_argument(p, "--project_prefix", help="outfile name, no .RDS!", type="character", default="multiome")
 p <- add_argument(p, "--grouping.var", help="grouping variable for peak calling algorithm", type = "character", default="NA")
 p <- add_argument(p, "--RDS.file.in", help="RDS in-file for the pipeline desired", default="NA")
 p <- add_argument(p, "--RunHarmony",flag=TRUE, help="Run Harmony batch correction")
@@ -82,6 +82,7 @@ if("init" %in% pipelines.to.run){
             function(sample){
             data.dir <- samplesheet$path[samplesheet$sampleName == sample]
             new.dir <- paste0("data/raw/", sample)
+            dir.create(new.dir)
             CombineDirectories(data.dir, new.dir, sample)
     })
 }
@@ -111,7 +112,7 @@ if("create" %in% pipelines.to.run){
                 return(seu)
             })
     names(obj.list) <- samples
-    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project-prefix, "-create-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix, "-create-obj-list.RDS"))
 }
 
 # Splitting up object(s) by SouporCell called assignment
@@ -160,14 +161,14 @@ if("callpeaks" %in% pipelines.to.run){
                 } 
                 return(obj)
             })
-    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project-prefix,"-callpeaks-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-callpeaks-obj-list.RDS"))
 }
 
 # quality control plots and clustering for each object individually
 # no subsetting is done in this pipeline, must be done manually (for now)
 if("qc" %in% pipelines.to.run){
 
-    pdf(file = paste0("output/plots/", argv$project-prefix, "-qc-plots.pdf"),
+    pdf(file = paste0("output/plots/", argv$project_prefix, "-qc-plots.pdf"),
         height = 8, width = 12)
     list.of.vars <- list("1" = c("nCount_RNA",  "nCount_ATAC"),
                      "2" = c("nFeature_RNA","nFeature_ATAC"),
@@ -222,7 +223,7 @@ if("qc" %in% pipelines.to.run){
     print(p.list.2)
     dev.off()
 
-    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project-prefix,"-qc-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-qc-obj-list.RDS"))
 }
 
 # filter objects based on qc output and user input
@@ -284,7 +285,7 @@ if("cluster" %in% pipelines.to.run){
     
     # plots to help decide resolution to use
     lapply(obj.list, function(obj){        
-        pdf(file = paste0("output/plots/", argv$project-prefix, "-cluster-plots.pdf"),
+        pdf(file = paste0("output/plots/", argv$project_prefix, "-cluster-plots.pdf"),
             height = 8, width = 12)
             
         clustree(obj@meta.data, prefix = "wsnn_res.")
@@ -328,7 +329,7 @@ if("cluster" %in% pipelines.to.run){
             write.csv(M, file = paste0("output/cluster-markers-bound.csv"))
         })
 
-    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project-prefix,"-cluster-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-cluster-obj-list.RDS"))
 }
 
 # merge objects and create conserved peaks across objects

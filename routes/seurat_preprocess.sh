@@ -10,14 +10,14 @@ if [ -f "data/raw/souporcell/out_gex/barcode-assignment-df.csv" ]; then
     scripts/multiome-processing.R \
         init,create,callpeaks,qc \
         configs/samplesheet.csv \
-        --project-prefix $project_prefix \
+        --project_prefix $project_prefix \
         -m $my_macs_path \
         --SoupOrCellDF data/raw/souporcell/out_gex/barcode-assignment-df.csv 
 else
     scripts/multiome-processing.R \
         init,create,callpeaks,qc \
         configs/samplesheet.csv \
-        --project-prefix $project_prefix \
+        --project_prefix $project_prefix \
         -m $my_macs_path
 fi
 
