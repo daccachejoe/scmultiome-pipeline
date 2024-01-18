@@ -1,5 +1,10 @@
 #!/bin/bash
 
+module load r/4.2.2
+Rscript renv::init()
+
+
+
 # install the required packages to make scmultiome executable in the desired directory
 mkdir .lib
 git clone https://bitbucket.org/djhshih/argparser.git .lib/argparser

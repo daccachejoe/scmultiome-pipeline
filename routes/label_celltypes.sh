@@ -1,5 +1,6 @@
 #!/bin/bash
 
+module load r/4.2.2
 
 if [[ $(wc -l < "configs/cluster_labels.csv") -gt 1 ]]; then
     echo Using annotating cell types with cluster_labels.csv

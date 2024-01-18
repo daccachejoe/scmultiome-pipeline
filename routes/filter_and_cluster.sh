@@ -1,6 +1,6 @@
 #!/bin/bash
+module load r/4.2.2
 
-module load r
 
 if [[ $(wc -l < "data/qc_df.csv") -gt 1 ]]; then
     scripts/multiome-processing.R \

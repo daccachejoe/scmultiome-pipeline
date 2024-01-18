@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 # first we convert the annotated object to h5ad    
 source $personal_anaconda_path
 conda activate $sceasy_env_name

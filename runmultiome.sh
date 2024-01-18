@@ -1,5 +1,3 @@
-#!/bin/bash
-
 export my_macs_path=/gpfs/data/naiklab/jd5457/opt/MACS/bin/macs3
 export project_prefix=multiome-control-skin
 export personal_anaconda_path=/gpfs/data/ruggleslab/jd5457/miniconda/miniconda/etc/profile.d/conda.sh
@@ -56,5 +54,5 @@ run_multiome() {
     "$1"
 }
 
-# Call the run_multiome function with the provided argument
-run_multiome "$1"
+# # Call the run_multiome function with the provided argument
+# run_multiome "$1"
