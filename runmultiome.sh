@@ -56,5 +56,5 @@ run_multiome() {
     "$1"
 }
 
-# # Call the run_multiome function with the provided argument
-# run_multiome "$1"
+# Call the run_multiome function with the provided argument
+run_multiome "$1"
