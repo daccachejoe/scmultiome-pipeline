@@ -5,48 +5,83 @@ This github repo contains the necessary scripts to run the scmultiome wrapper fu
 In order for the pipeline to work, the user must alllow for R scripts to be executed as typical command line functions.  
 
 ### Installation
-In the directory of your choosing, clone this repository and source the `install.sh` file  
+In the directory of your choosing, clone this repository into a project direcotry name of your choosing. For this example it is `test_dir`
 example installation:
 ```
-git clone https://github.com/jad362/scmultiome-wrappers.git
-cd scmultiome-wrappers
-source install.sh
+git clone https://github.com/jad362/scmultiome-wrappers.git test_dir
+cd test_dir
+# initialize the directory set up with the "init" route
+./runmultiome.sh init
+```
+This should set up your project directory to be able to use `argparser` and have the directories set up in the correct manner
+```
+[jd5457@bigpurple-ln1 testdir]$ tree
+.
+├── configs
+│   ├── cluster_labels.csv
+│   ├── qc_df.csv
+│   ├── resolution_to_use.txt
+│   ├── samplesheet.csv
+│   ├── scenicplus-preprocess-config.yml
+│   └── scenicplus-process-config.yml
+├── data
+│   ├── raw
+│   │   └── macs-peaks
+│   └── scenicplus
+│       └── cisTarget_dbs
+├── output
+│   ├── plots
+│   ├── RDS-files
+│   ├── tables
+│   └── ucd
+├── README.md
+├── routes
+│   ├── call_peaks_grouped.sh
+│   ├── filter_and_cluster.sh
+│   ├── identify_celltypes.sh
+│   ├── install.sh
+│   ├── label_celltypes.sh
+│   ├── run_scenicplus.sh
+│   ├── setup_dirs.sh
+│   ├── seurat_preprocess.sh
+│   └── test_filter_and_cluster.sh
+├── runmultiome.sh
+└── scripts
+    ├── convert_seruat_to_h5ad.R
+    ├── export_scenicplus_data.R
+    ├── functions.R
+    ├── label_celltypes.R
+    ├── logs
+    ├── multiome-processing.R
+    ├── plotting-UCD-and-seurat.R
+    ├── scenicplus-pipeline.py
+    └── ucd-script.py
 ```
 
-Let's test the installation by running our tester file and looking for the help message
+### Establishing the required files
+samplesheet.csv: the skeleton of your samplesheet is already geenrated for you in `configs/samplesheet.csv`. Let's read it.  
+The expected set up of your samplehseet is flexible but the first columns **MUST BE** sampleName and path, and those are written in for you already.
 ```
-./test.R -h
+[jd5457@bigpurple-ln1 testdir]$ cat configs/samplesheet.csv
+sampleName,path
 ```
-```
-usage: test.R [--] [--help] [--opts OPTS] [--digits DIGITS] number
+Now you can fill in the rows as needed as well as add any additional meta data you would like to include in your single cell experiments. Here is an example with 2 samples and an additional meta data column `cond` added
 
-Round a floating point number
+| sampleName | path                                                                       | cond  |
+| ---------- | -------------------------------------------------------------------------- | ----- |
+| ctrl.1     | /gpfs/data/sequence/results/naiklab/2023-03-24/cellranger/count-CTRL/outs  | ctrl  |
+| il17.1     | /gpfs/data/sequence/results/naiklab/2023-03-24/cellranger/count-IL-17/outs | il17a |
 
-positional arguments:
-  number        number to round
 
-flags:
-  -h, --help    show this help message and exit
-
-optional arguments:
-  -x, --opts    RDS file containing argument values
-  -d, --digits  number of decimal places [default: 0]
+### Running the multiome pipeline
+Now that our samplesheet is set up, we can run the first step of the pipeline which will be specified by `seurat_preprocess`
 ```
-Now let's see if the script can take in arguments and perform the expected tasks
-```
-./test.R 3.14159 
-./test.R 3.14159 -d 2
-```
-```
-3 
-3.14
+./runmultiome.sh seurat_preprocess
 ```
 
-### Running our scMulitome pipeline
-After ensuring argparser is functional, let's test out our pipeline and make sure it is executable and working
-```
-scripts/multiome-processing.R -h
-```
+
+
+
 ```
 usage: multiome-processing-v0.1.R [--] [--help] [--opts OPTS]
        [--outfilename OUTFILENAME] [--grouping.var GROUPING.VAR]
@@ -83,9 +118,3 @@ optional arguments:
 As the output indicates, the scripts excepts 2 mandatory arguments: pipeline(s) and samplesheet.  
 The example samplesheet shows what a samplesheet looks like.  
 IMPORTANT: the pipeline expects `sampleName` and `path` in a case sensitive manner and all sample-level meta data information to be added to come *after* the `path` column
-
-|sampleName|path|cond|
-|---|---|---|
-|ctrl.1|/gpfs/data/sequence/results/naiklab/2023-03-24/cellranger/count-CTRL/outs|ctrl|
-|il17.1|/gpfs/data/sequence/results/naiklab/2023-03-24/cellranger/count-IL-17/outs|il17a|
-
