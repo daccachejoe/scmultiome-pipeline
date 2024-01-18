@@ -57,6 +57,22 @@ This should set up your project directory to be able to use `argparser` and have
     ├── scenicplus-pipeline.py
     └── ucd-script.py
 ```
+## Ensuring you have the correct packages installed
+Seurat And Signac Processing of sc-multiome data (everything except for SCENIC+ analysis)
+* Seurat
+* Signac
+* EnsDb.Hsapiens.v86
+* enrichR
+* ggplot2
+* dplyr
+* motifmatchr
+* TFBSTools
+* JASPAR2020
+
+For SCENIC+ Analysis, three conda environments must be made  
+First: *sceasy* is used to convert R objects to h5ad files for use [package link](https://github.com/cellgeni/sceasy)  
+
+
 
 ### Establishing the required files
 samplesheet.csv: the skeleton of your samplesheet is already geenrated for you in `configs/samplesheet.csv`. Let's read it.  
