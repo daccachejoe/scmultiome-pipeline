@@ -2,14 +2,14 @@
 module load r/4.2.2
 
 
-if [[ $(wc -l < "data/qc_df.csv") -gt 1 ]]; then
+if [[ $(wc -l < "configs/qc_df.csv") -gt 0 ]]; then
     scripts/multiome-processing.R \
         filter,cluster \
-        data/samplesheet.csv \
+        configs/samplesheet.csv \
         --project_prefix $project_prefix \
         -m $my_macs_path \
         -R output/RDS-files/$project_prefix-qc-obj-list.RDS \
-        --qc.sheet data/qc_df.csv
+        --qc.sheet configs/qc_df.csv
 else
     echo "qc_df.csv does not have more than one line. Please fill it out and try again."
 fi

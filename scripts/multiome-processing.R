@@ -236,8 +236,13 @@ if ("filter" %in% pipelines.to.run) {
 
         # identify clusters to remove entirely
         clus.to.remove <- as.character(qc.df$cluster.to.remove[which(seu@project.name == qc.df$sampleName)])
-        clus.to.remove <- as.numeric(unlist(strsplit(clus.to.remove, split = ";")))
-        cells.in.clusters.to.remove <- rownames(md)[md$seurat_clusters %in% clus.to.remove]
+        if(clus.to.remove != "NA"){
+            clus.to.remove <- as.numeric(unlist(strsplit(clus.to.remove, split = ";")))
+            cells.in.clusters.to.remove <- rownames(md)[md$seurat_clusters %in% clus.to.remove]
+        } else {
+            cells.in.clusters.to.remove <- c()
+        }
+        
 
         # identify variables to filter data by
         vars.to.filter.by <- as.character(qc.df$vars.to.filter.by[which(seu@project.name == qc.df$sampleName)])
@@ -259,10 +264,14 @@ if ("filter" %in% pipelines.to.run) {
 
         # combine all filters
         filter_vector <- Reduce(`|`, filter_list)
-        cells.to.filter <- rownames(md)[filter_vector]
-
-        # combine all cells to remove
-        cells.to.remove <- cells.in.clusters.to.remove | cells.to.filter
+        cells.to.filter <- ifelse(length(filter_vector) > 0, rownames(md)[filter_vector], logical(0))
+        if(length(cells.in.clusters.to.remove) == 0) {
+            cells.to.remove <- cells.to.filter
+        } else if (length(cells.to.filter) == 0) {
+            cells.to.remove <- cells.in.clusters.to.remove
+        } else {
+            cells.to.remove <- c(cells.in.clusters.to.remove, cells.to.filter)
+        }
 
         seu <- subset(seu, cells = cells.to.remove, invert = TRUE)
         return(seu)
@@ -271,6 +280,7 @@ if ("filter" %in% pipelines.to.run) {
 
 # construct WNN graphs 
 if("cluster" %in% pipelines.to.run){
+    library(clustree, quietly=TRUE)
     message("Running Clustering Pipeline")
     obj.list <- 
         lapply(obj.list, 
@@ -289,23 +299,25 @@ if("cluster" %in% pipelines.to.run){
             height = 8, width = 12)
             
         clustree(obj@meta.data, prefix = "wsnn_res.")
-        DimPlot(object, reduction = "wnn.umap", group.by = paste0("wsnn_res.", seq(0.1, 1, 0.1)), label = T) & NoLegend()
-        p1 <- DimPlot(obj, reduction = "pca", group.by = res.to.use, label = TRUE, label.size = 5, repel = FALSE) + ggtitle("PCA")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
-        p2 <- DimPlot(obj, reduction = "umap.rna", group.by = res.to.use, label = TRUE, label.size = 5, repel = FALSE) + ggtitle("RNA")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
-        p3 <- DimPlot(obj, reduction = "umap.atac", group.by = res.to.use, label = TRUE, label.size = 5, repel = FALSE) + ggtitle("ATAC") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
-        p4 <- DimPlot(obj, reduction = "wnn.umap", group.by = res.to.use, label = TRUE, label.size = 5, repel = FALSE) + ggtitle("WNN") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
+        DimPlot(obj, reduction = "wnn.umap", group.by = paste0("wsnn_res.", seq(0.1, 1, 0.1)), label = T) & NoLegend()
+        p1 <- DimPlot(obj, reduction = "pca", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("PCA")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
+        p2 <- DimPlot(obj, reduction = "umap.rna", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("RNA")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
+        p3 <- DimPlot(obj, reduction = "umap.atac", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("ATAC") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
+        p4 <- DimPlot(obj, reduction = "wnn.umap", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("WNN") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
 
         if(!(argv$SoupOrCellDF == "NA")){
             p5 <- DimPlot(obj, reduction = "pca", group.by = "assignment", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("PCA") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
             p6 <- DimPlot(obj, reduction = "umap.rna", group.by = "assignment", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("RNA") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
             p7 <- DimPlot(obj, reduction = "umap.atac", group.by = "assignment", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("ATAC") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
             p8 <- DimPlot(obj, reduction = "wnn.umap", group.by = "assignment", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("WNN")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
-            ggpubr::ggarrange(
-            ggpubr::ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1),
-            ggpubr::ggarrange(p5, p6, p7, p8, ncol = 4, nrow = 1),
-            ncol = 1, nrow = 2)
+            print(
+                ggpubr::ggarrange(
+                    ggpubr::ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1),
+                    ggpubr::ggarrange(p5, p6, p7, p8, ncol = 4, nrow = 1),
+                    ncol = 1, nrow = 2)
+            )
         } else {
-            ggpubr::ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1)
+            print(ggpubr::ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1))
         }
         dev.off()
     })
@@ -326,7 +338,7 @@ if("cluster" %in% pipelines.to.run){
                 return(M) 
             })
             M <- bind_rows(M.list)
-            write.csv(M, file = paste0("output/cluster-markers-bound.csv"))
+            write.csv(M, file = paste0("output/tables/cluster-markers-bound.csv"))
         })
 
     saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-cluster-obj-list.RDS"))
