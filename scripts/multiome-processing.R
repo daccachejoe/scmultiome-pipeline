@@ -298,8 +298,8 @@ if("cluster" %in% pipelines.to.run){
         pdf(file = paste0("output/plots/", argv$project_prefix, "-cluster-plots.pdf"),
             height = 8, width = 12)
             
-        clustree(obj@meta.data, prefix = "wsnn_res.")
-        DimPlot(obj, reduction = "wnn.umap", group.by = paste0("wsnn_res.", seq(0.1, 1, 0.1)), label = T) & NoLegend()
+        print(clustree(obj@meta.data, prefix = "wsnn_res."))
+        print(DimPlot(obj, reduction = "wnn.umap", group.by = paste0("wsnn_res.", seq(0.1, 1, 0.1)), label = T) & NoLegend())
         p1 <- DimPlot(obj, reduction = "pca", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("PCA")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
         p2 <- DimPlot(obj, reduction = "umap.rna", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("RNA")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
         p3 <- DimPlot(obj, reduction = "umap.atac", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("ATAC") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
@@ -334,7 +334,7 @@ if("cluster" %in% pipelines.to.run){
                                     min.pct = 0.25, 
                                     logfc.threshold = 0.25)
                 M <- M %>% mutate(resolution = res)
-                write.csv(M, file = paste0("output/cluster-markers-res.", res, ".csv"))
+                write.csv(M, file = paste0("output/tables/cluster-markers-res.", res, ".csv"))
                 return(M) 
             })
             M <- bind_rows(M.list)

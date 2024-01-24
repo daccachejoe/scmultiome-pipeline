@@ -1,6 +1,6 @@
 #!/bin/bash
 
-module load r/4.2.2
+module load r/4.1.2
 
 # install the required packages to make scmultiome executable in the desired directory
 mkdir .lib

@@ -1,5 +1,5 @@
 #!/bin/bash
-module load r/4.2.2
+module load r/4.1.2
 
 
 if [[ $(wc -l < "configs/qc_df.csv") -gt 0 ]]; then

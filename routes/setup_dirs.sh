@@ -7,7 +7,7 @@
 # .data/scenicplus
 # ./data/scenicplus/cisTarget_dbs
 # ./scripts
-# ./scripts/logs
+# ./scripts/outs
 # ./output
 # ./output/RDS-files
 # ./output/plots
@@ -21,7 +21,7 @@
 mkdir -p ./data/raw \
          ./data/scenicplus/cisTarget_dbs \
          ./data/raw/macs-peaks \
-         ./scripts/logs \
+         ./scripts/outs \
          ./output/RDS-files \
          ./output/plots \
          ./output/tables \

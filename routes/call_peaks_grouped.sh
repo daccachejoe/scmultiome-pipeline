@@ -2,7 +2,7 @@
 
 
 module load macs2
-module load r/4.2.2
+module load r/4.1.2
 
 scripts/multiome-processing.R \
     callpeaks \
