@@ -2,7 +2,7 @@ installation steps
 
 1. create new env
 ```
-conda create -n scmultiome-pipeline-env python=3.
+conda create -n sc-multiome-pipeline-env python=3.
 conda activate scmultiome-pipeline-env
 ```
 activate cmake (module loaded here)

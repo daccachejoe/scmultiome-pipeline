@@ -8,11 +8,17 @@ In order for the pipeline to work, the user must alllow for R scripts to be exec
 In the directory of your choosing, clone this repository into a project direcotry name of your choosing. For this example it is `test_dir`
 example installation:
 ```
-git clone https://github.com/jad362/scmultiome-wrappers.git test_dir
+git clone https://github.com/Naiklab/scmultiome-pipeline.git test_dir
 cd test_dir
 # initialize the directory set up with the "init" route
-./runmultiome.sh init
+chmod +x run/runmultiome
+run/runmultiome init
 ```
+Now create your conda enviroment and follow the installation steps script to install the correct versions of the required packages
+
+
+
+
 This should set up your project directory to be able to use `argparser` and have the directories set up in the correct manner
 ```
 [jd5457@bigpurple-ln1 testdir]$ tree
