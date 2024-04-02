@@ -98,7 +98,7 @@ Now you can fill in the rows as needed as well as add any additional meta data y
 ### Running the multiome pipeline
 Now that our samplesheet is set up, we can run the first step of the pipeline which will be specified by `seurat_preprocess`
 ```
-./runmultiome.sh seurat_preprocess
+run/runmultiome seurat_preprocess
 ```
 
 
