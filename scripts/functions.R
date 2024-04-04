@@ -62,7 +62,8 @@ CallMyPeaks <- function(seu, fragpath=NULL,grouping.var=NULL,my.macs2.path=NULL,
     peaks <- CallPeaks(seu, 
       group.by = grouping.var,
       outdir = "./data/raw/macs-peaks",
-      macs2.path = my.macs2.path)
+      cleanup=FALSE,
+      # macs2.path = my.macs2.path)
     
     # dont want to lose the older peaks we had when peaks were called all together
     if(!is.null(grouping.var)){

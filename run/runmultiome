@@ -18,27 +18,27 @@ init() {
 
 seurat_preprocess() {
     echo "Running seurat preprocessing"
-    sbatch -c 32 -p a100_short --mem 300GB -o scripts/outs/preprocessing-%J.out -t 0-23:00:00 --export=ALL routes/seurat_preprocess.sh
+    sbatch -c 32 -p a100_short --mem 124GB  -o scripts/outs/preprocessing-%J.out -t 0-23:00:00 --export=ALL routes/seurat_preprocess.sh
 }
 
 filter_and_cluster() {
     echo "Running filtering and clustering"
-    sbatch -c 32 -p a100_short --mem 300GB -o scripts/outs/filter-and-cluster-%J.out -t 0-23:00:00 --export=ALL  routes/filter_and_cluster.sh
+    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/filter-and-cluster-%J.out -t 0-23:00:00 --export=ALL  routes/filter_and_cluster.sh
 }
 
 identify_celltypes() {
     echo "Helping identify cell types"
-    sbatch -c 32 -p a100_short --mem 300GB -o scripts/outs/identify-celltypes-%J.out -t 0-23:00:00 --export=ALL  routes/identify_celltypes.sh
+    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/identify-celltypes-%J.out -t 0-23:00:00 --export=ALL  routes/identify_celltypes.sh
 }
 
 label_celltypes() {
     echo "Labelling cell types with user inputs"
-    sbatch -c 32 -p a100_short --mem 300GB -o scripts/outs/label-celltypes-%J.out -t 0-23:00:00 --export=ALL  routes/label_celltypes.sh
+    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/label-celltypes-%J.out -t 0-23:00:00 --export=ALL  routes/label_celltypes.sh
 }
 
 call_peaks_grouped() {
     echo "Calling ATAC-Seq peaks grouped by cell type"
-    sbatch -c 32 -p a100_short --mem 300GB -o scripts/outs/callpeaks-grouped-%J.out -t 0-23:00:00 --export=ALL  routes/call_peaks_grouped.sh
+    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/callpeaks-grouped-%J.out -t 0-23:00:00 --export=ALL  routes/call_peaks_grouped.sh
 }
 
 run_scenicplus() {

@@ -4,6 +4,7 @@ echo $my_macs_path
 echo $project_prefix
 # seurat preprocessing chunk
 module load r/4.1.2
+module load macs2
 # pc
 # conda activate $conda_env_name
 
