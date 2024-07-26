@@ -10,6 +10,36 @@ export scenicplus_env_name=scenicplus
 export create_cistarget_databases_env_name=create_cistarget_databases
 export create_cistarget_databases_dir=/gpfs/home/jd5457/.conda/envs/create_cisTarget_databases/
 
+detect_scheduler() {
+    # change this to be some SLURM variable present in the login node
+    if [ ! -z "$SLURM_JOB_ID" ]; then
+        echo "SLURM detected"
+        export SCHEDULER="slurm"
+    elif [ ! -z "$$LSF_ENVDIR" ]; then
+        echo "LSF detected"
+        export SCHEDULER="lsf"
+    else
+        echo "No known job scheduler detected"
+        export SCHEDULER="none"
+    fi
+}
+
+submit_job() {
+    local script=$1
+    local output=$2
+    local time=$3
+    local mem=$4
+    local cores=$5
+
+    if [ "$SCHEDULER" == "slurm" ]; then
+        sbatch -c $cores -p a100_short --mem-per-cpu $mem -o $output -t $time --export=ALL $script
+    elif [ "$SCHEDULER" == "lsf" ]; then
+        bsub -P acc_naiklab -q premium -n $cores -R "rusage[mem=$mem]" -o $output -W $time $script
+    else
+        echo "No job scheduler available to submit job: $script"
+    fi
+}
+
 init() {
     echo "Initializing environment"
     bash routes/setup_dirs.sh
@@ -18,32 +48,32 @@ init() {
 
 seurat_preprocess() {
     echo "Running seurat preprocessing"
-    sbatch -c 32 -p a100_short --mem 124GB  -o scripts/outs/preprocessing-%J.out -t 0-23:00:00 --export=ALL routes/seurat_preprocess.sh
+    submit_job routes/seurat_preprocess.sh scripts/outs/preprocessing-%J.out 0-23:00:00 4000 32
 }
 
 filter_and_cluster() {
     echo "Running filtering and clustering"
-    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/filter-and-cluster-%J.out -t 0-23:00:00 --export=ALL  routes/filter_and_cluster.sh
+    submit_job routes/filter_and_cluster.sh scripts/outs/filter-and-cluster-%J.out 0-23:00:00 4000 32
 }
 
 identify_celltypes() {
     echo "Helping identify cell types"
-    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/identify-celltypes-%J.out -t 0-23:00:00 --export=ALL  routes/identify_celltypes.sh
+    submit_job routes/identify_celltypes.sh scripts/outs/identify-celltypes-%J.out 0-23:00:00 4000 32
 }
 
 label_celltypes() {
     echo "Labelling cell types with user inputs"
-    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/label-celltypes-%J.out -t 0-23:00:00 --export=ALL  routes/label_celltypes.sh
+    submit_job routes/label_celltypes.sh scripts/outs/label-celltypes-%J.out 0-23:00:00 4000 32
 }
 
 call_peaks_grouped() {
     echo "Calling ATAC-Seq peaks grouped by cell type"
-    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/callpeaks-grouped-%J.out -t 0-23:00:00 --export=ALL  routes/call_peaks_grouped.sh
+    submit_job routes/call_peaks_grouped.sh scripts/outs/callpeaks-grouped-%J.out 0-23:00:00 4000 32
 }
 
 run_scenicplus() {
     echo "Running SCENIC+"
-    sbatch -p gpu8_medium --mem 300GB -o scripts/outs/scenicplus-%J.out -t 0-23:00:00 --export=ALL  routes/run_scenicplus.sh
+    submit_job routes/run_scenicplus.sh scripts/outs/scenicplus-%J.out 0-23:00:00 4000 32
 }
 
 run_multiome() {
@@ -57,5 +87,10 @@ run_multiome() {
     "$1"
 }
 
+# Detect the scheduler before running any jobs
+detect_scheduler
+
 # Call the run_multiome function with the provided argument
 run_multiome "$1"
+
+
