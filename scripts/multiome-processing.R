@@ -62,7 +62,7 @@ samplesheet <- read.csv(samplesheet)
 samples <- samplesheet$sampleName
 
 # load in annotation files for peaks and ranges
-my.annotation <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
+annotation <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
 seqlevels(annotation) <- paste0('chr', seqlevels(annotation))
 peak.genome <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
 seqlevels(peak.genome) <- paste0('chr', seqlevels(peak.genome))
