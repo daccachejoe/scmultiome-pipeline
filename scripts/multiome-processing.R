@@ -48,7 +48,7 @@ typeof(argv$RunHarmony)
 library(Seurat, quietly=TRUE)
 library(Signac, quietly=TRUE)
 library(EnsDb.Hsapiens.v86, quietly=TRUE)
-library(BSgenome.Hsapiens.NCBI.GRCh38)
+library(BSgenome.Hsapiens.UCSC.hg38)
 library(dplyr, quietly=TRUE)
 library(ggplot2, quietly=TRUE)
 library(enrichR, quietly=TRUE)
@@ -64,7 +64,7 @@ samples <- samplesheet$sampleName
 # load in annotation files for peaks and ranges
 my.annotation <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
 seqlevels(annotation) <- paste0('chr', seqlevels(annotation))
-peak.genome <- BSgenome.Hsapiens.NCBI.GRCh38::BSgenome.Hsapiens.NCBI.GRCh38
+peak.genome <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
 seqlevels(peak.genome) <- paste0('chr', seqlevels(peak.genome))
 
 # load in data if desired
