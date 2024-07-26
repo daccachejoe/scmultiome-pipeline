@@ -411,7 +411,7 @@ if("merge" %in% pipelines.to.run){
             CreateChromatinAssay(
                     counts = feat.mat.list[[f.path.name]], 
                     fragments = frag.list[[f.path.name]], 
-                    annotation = my.annotation)
+                    annotation = annotation)
         return(seu)
     })
 
