@@ -47,7 +47,9 @@ typeof(argv$RunHarmony)
 # set up and load in R libraries needed for analysis
 library(Seurat, quietly=TRUE)
 library(Signac, quietly=TRUE)
-library(EnsDb.Hsapiens.v86, quietly=TRUE)
+# library(EnsDb.Hsapiens.v86, quietly=TRUE)
+# library(EnsDb.Hsapiens.v86, quietly=TRUE)
+library(BSgenome.Hsapiens.UCSC.hg19)
 library(dplyr, quietly=TRUE)
 library(ggplot2, quietly=TRUE)
 library(enrichR, quietly=TRUE)
@@ -62,9 +64,9 @@ samples <- samplesheet$sampleName
 
 # load in annotation files for peaks and ranges
 my.annotation <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
-seqlevelsStyle(my.annotation) <- "UCSC"
+seqlevels(annotation) <- paste0('chr', seqlevels(annotation))
 peak.genome <- BSgenome.Hsapiens.NCBI.GRCh38::BSgenome.Hsapiens.NCBI.GRCh38
-seqlevelsStyle(peak.genome) <- "UCSC"
+seqlevels(peak.genome) <- paste0('chr', seqlevels(peak.genome))
 
 # load in data if desired
 if(!(argv$RDS.file.in == "NA")){
