@@ -1,5 +1,12 @@
 #!/bin/bash
-module load r/4.1.2
+
+if [ "$SCHEDULER" == "slurm" ]; then
+    module load r/4.1.2
+elif [ "$SCHEDULER" == "lsf" ]; then
+    module load R/4.1.0
+else
+    echo "No job scheduler available to submit job: $script"
+fi
 
 
 if [[ $(wc -l < "configs/qc_df.csv") -gt 0 ]]; then
