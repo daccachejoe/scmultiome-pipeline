@@ -155,10 +155,10 @@ if("callpeaks" %in% pipelines.to.run){
             function(obj){
                 if(argv$grouping.var == "NA"){
                     # obj <- CallMyPeaks(obj)
-                    obj <- CallMyPeaks(obj, my.macs2.path=argv$my.macs.path)
+                    obj <- CallMyPeaks(obj, my.macs2.path=argv$my.macs.path, my.annotation = annotation)
                 } else {
                     # obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var)
-                    obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var, my.macs2.path=argv$my.macs.path)
+                    obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var, my.macs2.path=argv$my.macs.path, my.annotation = annotation)
                 } 
                 return(obj)
             })
