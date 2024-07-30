@@ -171,8 +171,8 @@ if("qc" %in% pipelines.to.run){
 
     pdf(file = paste0("output/plots/", argv$project_prefix, "-qc-plots.pdf"),
         height = 8, width = 12)
-    list.of.vars <- list("1" = c("nCount_RNA",  "nCount_ATAC"),
-                     "2" = c("nFeature_RNA","nFeature_ATAC"),
+    list.of.vars <- list("1" = c("nCount_RNA",  "nCount_peaks"),
+                     "2" = c("nFeature_RNA","nFeature_peaks"),
                      "3" = "percent.mt",
                      "4" = c("nucleosome_signal" ,"TSS.enrichment"))
     p.list <-
@@ -193,6 +193,14 @@ if("qc" %in% pipelines.to.run){
         return(p)
     })
     print(p.list)
+
+    density.scatter.list <- 
+        lapply(obj.list, 
+        function(seu){
+            p <- FeatureScatter(seu, x = 'nCount_peaks', y = 'TSS.enrichment', log_x = TRUE, quantiles = TRUE)
+            return(p)
+        })
+    print(density.scatter.list)
 
     # preprocessing
     obj.list <- lapply(obj.list,
@@ -236,8 +244,8 @@ if ("filter" %in% pipelines.to.run) {
         md <- seu@meta.data
 
         # identify clusters to remove entirely
-        clus.to.remove <- as.character(qc.df$cluster.to.remove[which(seu@project.name == qc.df$sampleName)])
-        if(clus.to.remove != "NA"){
+        clus.to.remove <- unique(as.character(qc.df$cluster.to.remove[which(seu@project.name == qc.df$sampleName)]))
+        if(!(is.na(clus.to.remove))){
             clus.to.remove <- as.numeric(unlist(strsplit(clus.to.remove, split = ";")))
             cells.in.clusters.to.remove <- rownames(md)[md$seurat_clusters %in% clus.to.remove]
         } else {

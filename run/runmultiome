@@ -49,32 +49,32 @@ init() {
 
 seurat_preprocess() {
     echo "Running seurat preprocessing"
-    submit_job routes/seurat_preprocess.sh scripts/outs/preprocessing-%J.out 12:00 12000 32
+    submit_job routes/seurat_preprocess.sh scripts/outs/preprocessing-%J.out 12:00 24000 32
 }
 
 filter_and_cluster() {
     echo "Running filtering and clustering"
-    submit_job routes/filter_and_cluster.sh scripts/outs/filter-and-cluster-%J.out 12:00 12000 32
+    submit_job routes/filter_and_cluster.sh scripts/outs/filter-and-cluster-%J.out 12:00 24000 32
 }
 
 identify_celltypes() {
     echo "Helping identify cell types"
-    submit_job routes/identify_celltypes.sh scripts/outs/identify-celltypes-%J.out 12:00 12000 32
+    submit_job routes/identify_celltypes.sh scripts/outs/identify-celltypes-%J.out 12:00 24000 32
 }
 
 label_celltypes() {
     echo "Labelling cell types with user inputs"
-    submit_job routes/label_celltypes.sh scripts/outs/label-celltypes-%J.out 12:00 12000 32
+    submit_job routes/label_celltypes.sh scripts/outs/label-celltypes-%J.out 12:00 24000 32
 }
 
 call_peaks_grouped() {
     echo "Calling ATAC-Seq peaks grouped by cell type"
-    submit_job routes/call_peaks_grouped.sh scripts/outs/callpeaks-grouped-%J.out 12:00 12000 32
+    submit_job routes/call_peaks_grouped.sh scripts/outs/callpeaks-grouped-%J.out 12:00 24000 32
 }
 
 run_scenicplus() {
     echo "Running SCENIC+"
-    submit_job routes/run_scenicplus.sh scripts/outs/scenicplus-%J.out 12:00 12000 32
+    submit_job routes/run_scenicplus.sh scripts/outs/scenicplus-%J.out 12:00 24000 32
 }
 
 run_multiome() {
