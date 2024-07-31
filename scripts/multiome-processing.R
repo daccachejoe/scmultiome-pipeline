@@ -357,23 +357,23 @@ if("cluster" %in% pipelines.to.run){
 if("merge" %in% pipelines.to.run){
     message("Running Merging Pipeline")
     # peak paths
-    peak.paths <- paste(
-        samplesheet$path,
-        "atac_peaks.bed",
-        sep = "/"
-    )
-
-    # peak list
-    peak.list <- lapply(peak.paths, rtracklayer::import)
-    names(peak.list) <- samplesheet$sampleName
-    peak.list <- lapply(peak.list, function(peak.object){
-                peak.object <- keepStandardChromosomes(peak.object, pruning.mode="coarse")
-                return(peak.object)
-        })
+    peak.list <- lapply(obj.list, function(seu){
+        assay.to.use <- "ATAC"
+        if(!(assay.to.use %in% names(seu@assays))){
+            assay.to.use <- "peaks"
+        }
+        peak.granges <- seu[[assay.to.use]]@ranges
+        return(peak.granges)
+    })
 
     # intersecting the peak list
     combined.peaks <- reduce(unlist(GRangesList(peak.list)))
-
+    
+    # Filter out bad peaks based on length
+    peakwidths <- width(combined.peaks)
+    combined.peaks <- combined.peaks[peakwidths  < 10000 & peakwidths > 20]
+    combined.peaks <- keepStandardChromosomes(combined.peaks, pruning.mode = "coarse")
+    
     # Filter out bad peaks based on length
     peakwidths <- width(combined.peaks)
     combined.peaks <- combined.peaks[peakwidths  < 10000 & peakwidths > 20]
@@ -462,7 +462,7 @@ if("merge" %in% pipelines.to.run){
                                     harmony = argv$RunHarmony, 
                                     resolution = 0.3)
     merged.obj <- list(merged.obj)
-    saveRDS(merged.obj, file = paste0(argv$outfilename, "-merged-obj-list.RDS"))
+    saveRDS(merged.obj, file = paste0("output/RDS-files/", argv$project_prefix,"-merged-obj-list.RDS"))
 }
 
 # link peaks to genes
