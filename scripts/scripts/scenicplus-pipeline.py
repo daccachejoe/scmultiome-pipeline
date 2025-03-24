@@ -6,12 +6,8 @@ import argparse
 import pickle
 import pandas as pd
 import scenicplus
-import pycisTopic 
+import pycisTopic
 import pyranges as pr
-# import dask.dataframe as dd
-from pycisTopic.cistopic_class import *
-from io import StringIO
-from scipy.io import mmread
 
 # define the defaults here
 class DEFAULTS():
@@ -27,11 +23,8 @@ class DEFAULTS():
         "output_path": "./output",
         "tmp_dir_path": "./gpfs/scratch/your_username",
         "cistarget_db_path": ".data/cisTargetDB",
-        "mallet_path" : "None",
         "rna_h5ad_name": "rna.h5ad",
         "atac_txt_name": "atac.txt",
-        "cell_names": "cell_names.txt",
-        "region_names": "region_names.txt",
         "cell_metadata_name": "metadata.txt",
         "pca_name": "pca.txt",
         "grouping_var": "cell_type",
@@ -98,46 +91,31 @@ def set_up_configs():
 
 # define the saving function to save keystrokes later
 def save_pickle(object, path):
-    with open(path, "wb") as f:
+    with open(path) as f:
         pickle.dump(object, f)
 
 def compute_topics(config):
-    from pycisTopic.lda_models import run_cgs_models_mallet
-    
     print("Computing Topics") 
     # get the paths from the config file
     atac_path = Path(f'{config["input_path"]}/{config["atac_txt_name"]}')
-    cell_names_path = Path(f'{config["input_path"]}/{config["cell_names"]}')
-    region_names_path = Path(f'{config["input_path"]}/{config["region_names"]}')
     cell_metadata_path = Path(f'{config["input_path"]}/{config["cell_metadata_name"]}')
-    mallet_path = config["mallet_path"]
-    
-    if mallet_path == "None":
-        print("Mallet path is not set. Please install Mallet and set the mallet_path in the config file.\nInstructions:\nwget https://github.com/mimno/Mallet/releases/download/v202108/Mallet-202108-bin.tar.gz\ntar -xf Mallet-202108-bin.tar.gz")
-        exit(1)
-
     tmpDir = Path(config["tmp_dir_path"])
     save_dir = Path(f'{config["tmp_dir_path"]}/scATAC')
     # define some standalone variables for ease
     cpus = int(config['cpus'])
 
     # read in ATAC count matrix
-    count_matrix = mmread(atac_path)
-    count_matrix = count_matrix.tocsr()
-
-    # read in cell barcodes
-    cell_names = pd.read_csv(cell_names_path, sep = "\t", header = None)
-    cell_names = cell_names.iloc[:,0].tolist()
-
-    # read in peak names
-    region_names = pd.read_csv(region_names_path, sep = "\t", header = None)
-    region_names = region_names.iloc[:,0].tolist()
-
+    count_matrix=pd.read_csv(atac_path, 
+                            sep='\t', 
+                            engine="pyarrow", 
+                            header=0, 
+                            index_col=0)
+    
     # read in cellular meta data
-    cell_data=pd.read_csv(cell_metadata_path, sep='\t', index_col=0)
+    cell_data=pd.read_csv(cell_metadata_path, sep='\t')
 
     # create the cistopic object
-    cistopic_obj = create_cistopic_object(fragment_matrix=count_matrix, cell_names = cell_names, region_names = region_names)
+    cistopic_obj = create_cistopic_object(fragment_matrix=count_matrix)
     cistopic_obj.add_cell_data(cell_data)
 
     # topic modelling
@@ -148,42 +126,36 @@ def compute_topics(config):
     # 2. To impute dropouts. since data is very sparse...
     # Let's generate models with increase ntopics since we are not sure what is correct n (much like PCA)
     # afterwards, choose the model with the "optimal" number of topics (automatically performed in the function)
-    models=run_cgs_models_mallet(cistopic_obj,
-                       n_topics=[2,5,10,15,20,25,30,35,40,45],
-                       n_cpu= cpus, # selecting computers here
-                       n_iter=500,
-                       random_state=555,
-                       alpha=50,
-                       alpha_by_topic=True,
-                       eta=0.1,
-                       eta_by_topic=False,
-                       save_path=None,
-                       tmp_path = tmpDir,
-                       mallet_path=mallet_path,
-                       reuse_corpus=False
-    )
+    models=run_cgs_models(cistopic_obj,
+                        n_topics=[2,5,10,15,20,25,30,35,40,45],
+                        n_cpu= cpus, # selecting computers here
+                        n_iter=500,
+                        random_state=555,
+                        alpha=50,
+                        alpha_by_topic=True,
+                        eta=0.1,
+                        eta_by_topic=False,
+                        save_path=None,
+                        _temp_dir = tmpDir)
 
     # # save results
     # if not save_dir.exists():
     #     save_dir.mkdir()
 
-    # save the cistopic object and models
+    # save the cistopic object
     save_pickle(cistopic_obj, save_dir / 'cistopic_obj.pkl')
-    save_pickle(models, save_dir / 'cistopic_models.pkl')
 
     print("Finished computing topics, evaluating models")
     # 4 quality control metrics to select the correct model    
 
-    # uncomment if loading in models from abaove (straight through is commented out)
-    models = pickle.load(open(os.path.join(save_dir / 'cistopic_models.pkl'), 'rb'))
-    cistopic_obj = pickle.load(open(os.path.join(save_dir / 'cistopic_obj.pkl'), 'rb'))
-    from pycisTopic.lda_models import evaluate_models
-    models
+    # # uncomment if loading in models from abaove (straight through is commented out)
+    # models = pickle.load(open(os.path.join(tmpDir, 'scATAC/models/control_skin_models_500_iter_LDA.pkl'), 'rb'))
+    # cistopic_obj = pickle.load(open(os.path.join(tmpDir, 'cistopic_obj.pkl'), 'rb'))
     model = evaluate_models(models,
                            return_model=True,
                            metrics=['Arun_2010','Cao_Juan_2009', 'Minmo_2011', 'loglikelihood'],
                            plot = True,
-                           save = save_dir / 'evaluated_models.png')
+                           save = save_dir / 'models/evaluated_models.png')
     cistopic_obj.add_LDA_model(model)
     # save the object
     save_pickle(cistopic_obj, save_dir / 'cistopic_obj.pkl')
@@ -192,14 +164,6 @@ def compute_topics(config):
     return(cistopic_obj)
 
 def indentify_enhancers(config, cistopic_obj):
-    from pycisTopic.topic_binarization import binarize_topics
-    from pycisTopic.diff_features import (
-        impute_accessibility,
-        normalize_scores,
-        find_highly_variable_features,
-        find_diff_features
-    )  
-
     save_dir = Path(f'{config["tmp_dir_path"]}/scATAC')
     grouping_var = config['grouping_var']
 

@@ -1,14 +1,53 @@
 #!/bin/bash
 
-export conda_env_name=sc-multiome-pipeline-env
-export my_macs_path=/gpfs/data/naiklab/jd5457/opt/MACS/bin/macs3
 export project_prefix=multiome-control-skin
-export personal_anaconda_path=/gpfs/data/ruggleslab/jd5457/miniconda/miniconda/etc/profile.d/conda.sh
+# export project_prefix=multiome-control-skin-split-lineage-
+export conda_env_name=sc-multiome-pipeline-env
+# export my_macs_path=/gpfs/data/naiklab/jd5457/opt/MACS/bin/macs3
+# export my_macs_path=/sc/arion/projects/naiklab/daccache/.hidden-libraries/miniconda3/envs/joe-macs/bin/macs2
+export my_macs_path=/sc/arion/projects/naiklab/daccache/.hidden-libraries/miniconda3/envs/joe-macs3/bin/macs3
+# export my_macs_path=/hpc/packages/minerva-centos7/py_packages/2.7/bin/macs
+# export personal_anaconda_path=/gpfs/data/ruggleslab/jd5457/miniconda/miniconda/etc/profile.d/conda.sh
+export personal_anaconda_path=/sc/arion/projects/naiklab/daccache/.hidden-libraries/miniconda3/etc/profile.d/conda.sh
 export sceasy_env_name=sceasy-joe
 export UCD_env_name=ucdenv
-export scenicplus_env_name=scenicplus
-export create_cistarget_databases_env_name=create_cistarget_databases
-export create_cistarget_databases_dir=/gpfs/home/jd5457/.conda/envs/create_cisTarget_databases/
+export scenicplus_env_name=scenicplus-joe
+export create_cistarget_databases_path=/sc/arion/projects/naiklab/daccache/.hidden-libraries/miniconda3/envs/scenicplus-joe/create_cisTarget_databases
+# export create_cistarget_databases_dir=/gpfs/home/jd5457/.conda/envs/create_cisTarget_databases/
+create_cistarget_databases_dir='/sc/arion/projects/naiklab/daccache/.hidden-libraries/miniconda3/envs/create_cisTarget_databases'
+
+detect_scheduler() {
+    # change this to be some SLURM variable present in the login node
+    if [ ! -z "$SLURM_JOB_ID" ]; then
+        echo "SLURM detected"
+        export SCHEDULER="slurm"
+    elif [ ! -z "$$LSF_ENVDIR" ]; then
+        echo "LSF detected"
+        export SCHEDULER="lsf"
+    else
+        echo "No known job scheduler detected"
+        export SCHEDULER="none"
+    fi
+}
+
+submit_job() {
+    local script=$1
+    local output=$2
+    local time=$3
+    local mem=$4
+    local cores=$5
+
+    if [ "$SCHEDULER" == "slurm" ]; then
+        time=0-$time:00
+        sbatch -c $cores -p a100_short --mem-per-cpu $mem -o $output -t $time --export=ALL $script
+    elif [ "$SCHEDULER" == "lsf" ]; then
+        # bsub -P acc_naiklab -q premium -n $cores -R "rusage[mem=$mem]" -R "select[osmajor=CENT7]" -o $output -W $time $script
+        bsub -P acc_naiklab -q premium -n $cores -R "rusage[mem=$mem]" -R span[hosts=1]  -o $output -W $time $script
+    # else
+    else
+        echo "No job scheduler available to submit job: $script"
+    fi
+}
 
 init() {
     echo "Initializing environment"
@@ -18,32 +57,43 @@ init() {
 
 seurat_preprocess() {
     echo "Running seurat preprocessing"
-    sbatch -c 32 -p a100_short --mem 124GB  -o scripts/outs/preprocessing-%J.out -t 0-23:00:00 --export=ALL routes/seurat_preprocess.sh
+    submit_job routes/seurat_preprocess.sh scripts/outs/preprocessing-%J.out 12:00 24000 32
 }
 
 filter_and_cluster() {
     echo "Running filtering and clustering"
-    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/filter-and-cluster-%J.out -t 0-23:00:00 --export=ALL  routes/filter_and_cluster.sh
+    submit_job routes/filter_and_cluster.sh scripts/outs/filter-and-cluster-%J.out 36:00 32000 24
+}
+
+run_merged_pipeline() {
+    echo "Running merged pipeline"
+    submit_job routes/merged_pipeline.sh scripts/outs/merged-pipeline-%J.out 12:00 48000 32
 }
 
 identify_celltypes() {
     echo "Helping identify cell types"
-    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/identify-celltypes-%J.out -t 0-23:00:00 --export=ALL  routes/identify_celltypes.sh
+    submit_job routes/identify_celltypes.sh scripts/outs/identify-celltypes-%J.out 12:00 24000 32
 }
 
 label_celltypes() {
     echo "Labelling cell types with user inputs"
-    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/label-celltypes-%J.out -t 0-23:00:00 --export=ALL  routes/label_celltypes.sh
+    submit_job routes/label_celltypes.sh scripts/outs/label-celltypes-%J.out 12:00 24000 32
 }
 
 call_peaks_grouped() {
     echo "Calling ATAC-Seq peaks grouped by cell type"
-    sbatch -c 32 -p a100_short --mem 124GB -o scripts/outs/callpeaks-grouped-%J.out -t 0-23:00:00 --export=ALL  routes/call_peaks_grouped.sh
+    submit_job routes/call_peaks_grouped.sh scripts/outs/callpeaks-grouped-%J.out 36:00 32000 24
+}
+
+linkpeaks() {
+    echo "Linking peaks to genes"
+    submit_job routes/linkpeaks.sh scripts/outs/linkpeaks-%J.out 36:00 12000 6
 }
 
 run_scenicplus() {
     echo "Running SCENIC+"
-    sbatch -p gpu8_medium --mem 300GB -o scripts/outs/scenicplus-%J.out -t 0-23:00:00 --export=ALL  routes/run_scenicplus.sh
+    submit_job routes/run_scenicplus.sh scripts/outs/scenicplus-%J.out 12:00 40000 32
+    # submit_job routes/run_scenicplus.sh scripts/outs/scenicplus-%J.out 120:00 18000 24
 }
 
 run_multiome() {
@@ -57,5 +107,10 @@ run_multiome() {
     "$1"
 }
 
+# Detect the scheduler before running any jobs
+detect_scheduler
+
 # Call the run_multiome function with the provided argument
 run_multiome "$1"
+
+
