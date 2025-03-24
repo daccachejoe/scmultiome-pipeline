@@ -9,7 +9,7 @@ activate cmake (module loaded here)
 ```module load cmake```
 
 Install SCENIC+ as defined by the authors (Link here)[https://scenicplus.readthedocs.io/en/latest/install.html]
-
+```ml load rust/1.61.0```
 
 
 install cCreateCisTargetDatabase

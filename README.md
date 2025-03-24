@@ -13,6 +13,8 @@ cd test_dir
 # initialize the directory set up with the "init" route
 chmod +x run/runmultiome
 run/runmultiome init
+
+chmod +x routes/*
 ```
 Now create your conda enviroment and follow the installation steps script to install the correct versions of the required packages
 
