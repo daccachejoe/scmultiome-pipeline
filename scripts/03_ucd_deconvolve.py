@@ -1,6 +1,7 @@
 # script for running UCDdeonvolve on a single dataset
 
 # ucdenv script from an h5ad file
+import argparse
 import scanpy as sc
 import ucdeconvolve as ucd
 
@@ -36,11 +37,11 @@ def run_unbiased(adata):
 
     # assign labels (first pass)
     ucd.utils.assign_top_celltypes(adata, category = "raw", groupby = args.resolution)
-    celltypes = ucd.utils.assign_top_celltypes(adata, groupby = rgs.resolution, category = "raw",  inplace = False)
+    celltypes = ucd.utils.assign_top_celltypes(adata, groupby = args.resolution, category = "raw",  inplace = False)
 
     # export the annotations
     cellDF=adata.obs
-    cellDF.to_csv("data/r-objects/anndata/cellmetadata-unbiased.csv")
+    cellDF.to_csv("./output/ucd/cellmetadata-unbiased.csv")
 
     # explain the genes driving the cell type prediction
     ucd.tl.explain(adata, celltypes = celltypes, groupby = args.resolution, group_n = 64)
@@ -82,9 +83,13 @@ def run_referenced(adata,reference):
 
 
 def __main__():
-    adata, reference_data = ReadinObjects(args.input_file, args.reference_file)
+    adata, reference_data = ReadinObjects(args)
     run_unbiased(adata)
-    
+
     if args.reference_file is not None:
         run_referenced(adata, reference_data)
+
+
+if __name__ == "__main__":
+    __main__()
 

@@ -29,11 +29,11 @@ if [ ! -f configs/cluster_labels.csv ]; then
 fi
 # cp the scenicplus config template, twice, once as the preprocess config and once as the process config
 if [ ! -f configs/scenicplus-preprocess-config.yml ]; then
-    cp scripts/scenicplus-config-template.yml configs/scenicplus-preprocess-config.yml
+    cp scripts/optional/scenicplus-config-template.yml configs/scenicplus-preprocess-config.yml
     sed -i "s#__SCENICPLUS_TMP_DIR__#${scenicplus_tmp_dir}#g" configs/scenicplus-preprocess-config.yml
 fi
 if [ ! -f configs/scenicplus-process-config.yml ]; then
-    cp scripts/scenicplus-config-template.yml configs/scenicplus-process-config.yml
+    cp scripts/optional/scenicplus-config-template.yml configs/scenicplus-process-config.yml
     sed -i "s#__SCENICPLUS_TMP_DIR__#${scenicplus_tmp_dir}#g" configs/scenicplus-process-config.yml
     # the process config runs the full downstream SCENIC+ steps, unlike preprocess
     sed -i 's/pycisTarget: false/pycisTarget: true/g' configs/scenicplus-process-config.yml

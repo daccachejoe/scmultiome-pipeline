@@ -8,9 +8,9 @@ else
     echo "No job scheduler available to submit job: $script"
 fi
 
-scripts/multiome-processing.R \
+scripts/seurat_signac_pipeline.R \
         linkpeaks \
         configs/samplesheet.csv \
         --project_prefix $project_prefix-improved-clust-filtered-full- \
         --grouping.var cell.group \
-        -R output/RDS-files/multiome-control-skin-grouped-peaks-callpeaks-obj-list.RDS
+        -R output/RDS-files/$project_prefix-grouped-peaks-05-callpeaks-obj-list.RDS

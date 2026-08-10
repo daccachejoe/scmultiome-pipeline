@@ -9,11 +9,11 @@ else
 fi
 
 echo Running merged pipeline
-scripts/multiome-processing.R \
+scripts/seurat_signac_pipeline.R \
         filter,merge \
         configs/samplesheet.csv \
         --qc.sheet configs/qc_df.csv \
         --project_prefix $project_prefix \
         -m $my_macs_path \
         --RunHarmony \
-        -R output/RDS-files/$project_prefix-qc-obj-list.RDS
+        -R output/RDS-files/$project_prefix-01-qc-obj-list.RDS

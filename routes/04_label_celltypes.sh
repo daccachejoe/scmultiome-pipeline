@@ -12,7 +12,7 @@ if [[ $(wc -l < "configs/cluster_labels.csv") -gt 1 ]]; then
     echo Using annotating cell types with cluster_labels.csv
     resolution=$(cat configs/resolution_to_use.txt)
 
-    Rscript scripts/label_celltypes.R \
+    Rscript scripts/04_label_celltypes.R \
         configs/cluster_labels.csv \
         $resolution \
         output/RDS-files/$project_prefix-merged-obj-list.RDS \

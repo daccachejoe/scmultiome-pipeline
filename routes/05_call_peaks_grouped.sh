@@ -9,7 +9,7 @@ else
     echo "No job scheduler available to submit job: $script"
 fi
 
-scripts/multiome-processing.R \
+scripts/seurat_signac_pipeline.R \
     callpeaks \
     configs/samplesheet.csv \
     -g cell.type \

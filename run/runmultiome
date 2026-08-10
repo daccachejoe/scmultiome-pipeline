@@ -62,49 +62,48 @@ init() {
         echo "Created config/pipeline.config from the template."
         echo "Edit it with your HPC/environment values before running further stages."
     fi
-    bash routes/setup_dirs.sh
-    bash routes/install.sh
+    bash routes/00_setup_dirs.sh
+    bash routes/00_install.sh
 }
 
 seurat_preprocess() {
-    echo "Running seurat preprocessing"
-    submit_job routes/seurat_preprocess.sh scripts/outs/preprocessing-%J.out 12:00 24000 32
-}
-
-filter_and_cluster() {
-    echo "Running filtering and clustering"
-    submit_job routes/filter_and_cluster.sh scripts/outs/filter-and-cluster-%J.out 36:00 32000 24
+    echo "Step 01: Running seurat preprocessing"
+    submit_job routes/01_seurat_preprocess.sh scripts/outs/01-preprocessing-%J.out 12:00 24000 32
 }
 
 run_merged_pipeline() {
-    echo "Running merged pipeline"
-    submit_job routes/merged_pipeline.sh scripts/outs/merged-pipeline-%J.out 12:00 48000 32
+    echo "Step 02a: Running merged pipeline"
+    submit_job routes/02a_merge_pipeline.sh scripts/outs/02a-merged-pipeline-%J.out 12:00 48000 32
+}
+
+filter_and_cluster() {
+    echo "Step 02b: Running filtering and subclustering"
+    submit_job routes/02b_filter_and_subcluster.sh scripts/outs/02b-filter-and-cluster-%J.out 36:00 32000 24
 }
 
 identify_celltypes() {
-    echo "Helping identify cell types"
-    submit_job routes/identify_celltypes.sh scripts/outs/identify-celltypes-%J.out 12:00 24000 32
+    echo "Step 03: Helping identify cell types"
+    submit_job routes/03_identify_celltypes.sh scripts/outs/03-identify-celltypes-%J.out 12:00 24000 32
 }
 
 label_celltypes() {
-    echo "Labelling cell types with user inputs"
-    submit_job routes/label_celltypes.sh scripts/outs/label-celltypes-%J.out 12:00 24000 32
+    echo "Step 04: Labelling cell types with user inputs"
+    submit_job routes/04_label_celltypes.sh scripts/outs/04-label-celltypes-%J.out 12:00 24000 32
 }
 
 call_peaks_grouped() {
-    echo "Calling ATAC-Seq peaks grouped by cell type"
-    submit_job routes/call_peaks_grouped.sh scripts/outs/callpeaks-grouped-%J.out 36:00 32000 24
+    echo "Step 05: Calling ATAC-Seq peaks grouped by cell type"
+    submit_job routes/05_call_peaks_grouped.sh scripts/outs/05-callpeaks-grouped-%J.out 36:00 32000 24
 }
 
 linkpeaks() {
-    echo "Linking peaks to genes"
-    submit_job routes/linkpeaks.sh scripts/outs/linkpeaks-%J.out 36:00 12000 6
+    echo "Step 06: Linking peaks to genes"
+    submit_job routes/06_linkpeaks.sh scripts/outs/06-linkpeaks-%J.out 36:00 12000 6
 }
 
 run_scenicplus() {
-    echo "Running SCENIC+"
-    submit_job routes/run_scenicplus.sh scripts/outs/scenicplus-%J.out 12:00 40000 32
-    # submit_job routes/run_scenicplus.sh scripts/outs/scenicplus-%J.out 120:00 18000 24
+    echo "Step 07 (optional): Running SCENIC+"
+    submit_job routes/optional/07_run_scenicplus.sh scripts/outs/07-scenicplus-%J.out 12:00 40000 32
 }
 
 run_multiome() {

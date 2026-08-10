@@ -133,7 +133,7 @@ if("create" %in% pipelines.to.run){
                 return(seu)
             })
     names(obj.list) <- samples
-    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix, "-create-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix, "-01-create-obj-list.RDS"))
 }
 
 # Splitting up object(s) by SouporCell called assignment
@@ -174,13 +174,16 @@ if("callpeaks" %in% pipelines.to.run){
         lapply(obj.list, 
             function(obj){
                 if(argv$grouping.var == "NA"){
-                    obj <- CallMyPeaks(obj, my.macs2.path=argv$my.macs.path, my.annotation = annotation, blacklist = blacklist.to.use)
+                    obj <- CallPeaksMACS(obj, my.macs2.path=argv$my.macs.path, my.annotation = annotation, blacklist = blacklist.to.use)
                 } else {
-                    obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var, my.macs2.path=argv$my.macs.path, my.annotation = annotation, blacklist = blacklist.to.use)
+                    obj <- CallPeaksMACS(obj, grouping.var=argv$grouping.var, my.macs2.path=argv$my.macs.path, my.annotation = annotation, blacklist = blacklist.to.use)
                 }
                 return(obj)
             })
-    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-callpeaks-obj-list.RDS"))
+    # callpeaks is invoked both from stage 01 (per-sample, no grouping) and
+    # stage 05 (grouped by cell type, --grouping.var set)
+    callpeaks.step <- ifelse(argv$grouping.var == "NA", "01", "05")
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix, "-", callpeaks.step, "-callpeaks-obj-list.RDS"))
 }
 
 # quality control plots and clustering for each object individually
@@ -250,7 +253,7 @@ if("qc" %in% pipelines.to.run){
     print(p.list.2)
     dev.off()
 
-    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-qc-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-01-qc-obj-list.RDS"))
 }
 
 # filter objects based on qc output and user input
@@ -318,7 +321,7 @@ if("cluster" %in% pipelines.to.run){
     obj.list <- 
         lapply(obj.list, 
             function(obj){
-                obj <- Preprocess.and.Reduce.Dims(obj, 
+                obj <- PreprocessAndReduceDims(obj, 
                                                 harmony = argv$RunHarmony,
                                                 harmony.vars = "orig.ident")
                 obj <- ConstructWNNGraph(obj, 
@@ -326,7 +329,7 @@ if("cluster" %in% pipelines.to.run){
                                         resolution = seq(0,1,0.1))
                 return(obj)
             })
-    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-cluster-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-02b-cluster-obj-list.RDS"))
     
     # plots to help decide resolution to use
     lapply(obj.list, function(obj){        
@@ -376,7 +379,7 @@ if("cluster" %in% pipelines.to.run){
             write.csv(M, file = paste0("output/tables/cluster-markers-bound.csv"))
         })
 
-    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-cluster-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-02b-cluster-obj-list.RDS"))
 }
 
 # perform sub-clustering analysis on a list of objects
@@ -416,7 +419,7 @@ if("subcluster" %in% pipelines.to.run){
                                     )
         residual.features.to.use <- names(table(unlist(residual.features)))[table(unlist(residual.features)) >= 5]
 
-        merged.obj <- Preprocess.and.Reduce.Dims(obj, 
+        merged.obj <- PreprocessAndReduceDims(obj, 
                 harmony = TRUE,
                 harmony.vars = c("insitution", "orig.ident"),
                 residual.features = residual.features.to.use,
@@ -436,7 +439,7 @@ if("subcluster" %in% pipelines.to.run){
         message("Completed subclustering of ", merged.obj$cell.lineage[1])
         return(merged.obj)
     })
-    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-subcluster-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-02b-subcluster-obj-list.RDS"))
 }
 
 # merge objects and create conserved peaks across objects
@@ -534,7 +537,7 @@ if("merge" %in% pipelines.to.run){
         message("RunHarmony flagged as not TRUE")
         my.harmony.vars <- NULL
     }
-    merged.obj <- Preprocess.and.Reduce.Dims(merged.obj, 
+    merged.obj <- PreprocessAndReduceDims(merged.obj, 
         harmony = argv$RunHarmony,
         harmony.vars = my.harmony.vars,
         residual.features = residual.features.to.use,
@@ -544,7 +547,7 @@ if("merge" %in% pipelines.to.run){
                                     harmony = argv$RunHarmony, 
                                     resolution = seq(0,1,0.1))
     merged.obj <- list(merged.obj)
-    saveRDS(merged.obj, file = paste0("output/RDS-files/", argv$project_prefix,"-merged-obj-list-improved.RDS"))
+    saveRDS(merged.obj, file = paste0("output/RDS-files/", argv$project_prefix,"-02a-merge-obj-list.RDS"))
 }
 
 # link peaks to genes
@@ -562,14 +565,14 @@ if("linkpeaks" %in% pipelines.to.run){
 
                     # genes.to.link <- M %>% filter(p_val_adj < 0.1) %>% arrange(cluster, desc(avg_log2FC)) %>% pull(gene)
                     genes.to.link <- NULL
-                    obj <- LinkMyPeaks(obj,
+                    obj <- LinkPeaksToGenes(obj,
                                         genes = genes.to.link,
                                         distance.to.use = 250001,
                                         peak.genome = peak.genome)
                     gc()
                     return(obj)
             })
-    saveRDS(obj.list, file = paste0("output/RDS-files/",argv$project_prefix, "-250-linked-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/",argv$project_prefix, "-06-linkpeaks-obj-list.RDS"))
 }
 
 # footprinting TF activity by motifs
@@ -583,7 +586,7 @@ if("footprint" %in% pipelines.to.run){
         lapply(obj.list,
             function(obj){
                 footprint.obj <-
-                    FootprintMyPeaks(obj,
+                    FootprintMotifs(obj,
                         peaks.to.test = peaks.to.footprint,
                         peak.genome = peak.genome,
                         jaspar.taxid = jaspar.taxid)

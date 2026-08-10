@@ -49,7 +49,7 @@ CreateMultiomeSeurat <- function(data.dir, my.annotation = annotation, frag.path
 # blacklist: a Signac blacklist GRanges appropriate for the genome build in
 # use (e.g. Signac::blacklist_hg38_unified for human, Signac::blacklist_mm10
 # for mouse). Defaults to the human hg38 blacklist for backwards compatibility.
-CallMyPeaks <- function(seu, fragpath=NULL,grouping.var=NULL,my.macs2.path=NULL,my.annotation=NULL,blacklist=NULL){
+CallPeaksMACS <- function(seu, fragpath=NULL,grouping.var=NULL,my.macs2.path=NULL,my.annotation=NULL,blacklist=NULL){
     require(Seurat)
     require(Signac)
 
@@ -111,7 +111,7 @@ CallMyPeaks <- function(seu, fragpath=NULL,grouping.var=NULL,my.macs2.path=NULL,
 }
 
 # performing classical normalization and dimensionality reduction
-Preprocess.and.Reduce.Dims <- function(seu, harmony=FALSE, 
+PreprocessAndReduceDims <- function(seu, harmony=FALSE, 
                                         rna.pcs=30, atac.pcs=30, harmony.vars = NULL, 
                                         rna.theta = 0.5, atac.theta = 0.5,
                                         vars.to.regress=NULL, residual.features = NULL, 
@@ -180,7 +180,7 @@ ConstructWNNGraph <- function(seu, harmony = FALSE, resolution = 0.8, rna.pcs=30
 }
 
 # links peaks to genes to determine if there is a link between accessibility and expression
-LinkMyPeaks <- function(seu, genes = NULL, peak.genome,distance.to.use=1000000){
+LinkPeaksToGenes <- function(seu, genes = NULL, peak.genome,distance.to.use=1000000){
     require(Seurat)
     require(Signac)
   DefaultAssay(seu) <- "peaks"
@@ -251,7 +251,7 @@ RunEnrichR <- function(genes.to.test, dbs=NULL, plot=T, title =NULL, top.n = 30)
 
 
 # keep standard chromosomes of a BSgenome object
-keepBSgenomeSequences <- function(genome, seqnames)
+KeepBSgenomeSequences <- function(genome, seqnames)
 {
   stopifnot(all(seqnames %in% seqnames(genome)))
   genome@user_seqnames <- setNames(seqnames, seqnames)
@@ -260,14 +260,14 @@ keepBSgenomeSequences <- function(genome, seqnames)
 }
 
 # taken from https://stackoverflow.com/questions/25149520/append-filename-with-date 
-date.time.append <- function(str, sep = '-', date.format ="%Y_%m_%d_%H_%M_%S") {
+AppendDateTime <- function(str, sep = '-', date.format ="%Y_%m_%d_%H_%M_%S") {
   stopifnot(is.character(str))
   return(paste(str, format(Sys.time(), date.format), sep = sep))  
 }
 
 # footprint motifs and specific peaks
 # jaspar.taxid: NCBI taxonomy ID for JASPAR motif lookup (9606 = human, 10090 = mouse)
-FootprintMyPeaks <- function(obj, peaks.to.test, motifs.to.test=NULL, peak.genome=NULL, motif.set=NULL, jaspar.taxid=9606){
+FootprintMotifs <- function(obj, peaks.to.test, motifs.to.test=NULL, peak.genome=NULL, motif.set=NULL, jaspar.taxid=9606){
   require(motifmatchr)
   require(TFBSTools)
   require(JASPAR2020)

@@ -17,4 +17,4 @@ fi
 # Rscript install.R
 # R CMD INSTALL .
 
-chmod +x scripts/multiome-processing.R
+chmod +x scripts/seurat_signac_pipeline.R
