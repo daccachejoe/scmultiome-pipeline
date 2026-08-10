@@ -49,7 +49,7 @@ def run_unbiased(adata):
 
     for value in celltypes.values():
         plot=ucd.pl.explain_boxplot(adata, key = "ucdexplain", celltypes=value, n_top_genes = 16, ncols = 4, return_fig = True)
-        plot.savefig(f"./output/ucd/ucdeconvolve-clustermap-boxplot-{value}-.png")
+        plot.savefig(f"./output/ucd/ucdeconvolve-clustermap-boxplot-{value}-unbiased.png")
 
 
 def run_referenced(adata,reference):

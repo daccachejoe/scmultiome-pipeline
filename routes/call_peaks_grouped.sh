@@ -1,13 +1,19 @@
 #!/bin/bash
 
-
-module load macs2
-module load r/4.1.2
+if [ "$SCHEDULER" == "slurm" ]; then
+    module load r/4.1.2
+    module load macs2
+elif [ "$SCHEDULER" == "lsf" ]; then
+    module load R/4.2.0
+    # module load macs/2.1.0
+else
+    echo "No job scheduler available to submit job: $script"
+fi
 
 scripts/multiome-processing.R \
     callpeaks \
-    data/samplesheet.csv \
-    -g ct \
+    configs/samplesheet.csv \
+    -g cell.type \
     --project_prefix $project_prefix-grouped-peaks \
-    -R output/RDS-files/$project_prefix-annotated-obj-list.RDS \
+    -R output/RDS-files/$project_prefix-improved-clustering-annotated-filtered.RDS \
     -m $my_macs_path 

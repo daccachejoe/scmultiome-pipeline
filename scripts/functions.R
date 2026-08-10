@@ -15,7 +15,7 @@ CombineDirectories <- function(data.dir, new.dir, sample){
 }
 
 # load in data and create assays for both Gene Expression and ATAC Peaks
-CreateMultiomeSeurat <- function(data.dir, annotation = my.annotation, frag.path=NULL, rename.rows=F){
+CreateMultiomeSeurat <- function(data.dir, my.annotation = annotation, frag.path=NULL, rename.rows=F){
     require(Seurat)
     require(Signac)
     mat.list <- Read10X(data.dir)
@@ -51,19 +51,27 @@ CallMyPeaks <- function(seu, fragpath=NULL,grouping.var=NULL,my.macs2.path=NULL,
     require(Seurat)
     require(Signac)
 
-    DefaultAssay(seu) <- "ATAC"
+    atac.assay <- ifelse("ATAC" %in% names(seu@assays), "ATAC", "peaks")
+    DefaultAssay(seu) <- atac.assay
     # if(is.null(fragpath)){
     #   fragments <- Fragments(seu)
     #   fragpath <- fragments[[1]]@path
     # }
     # call peaks using MACS2
     seqlevelsStyle(blacklist_hg38_unified) <- "NCBI"
+   if(!is.null(grouping.var)){
+      seu@meta.data[[grouping.var]] <- stringr::str_replace_all(seu@meta.data[[grouping.var]], " ", "_")
+      seu@meta.data[[grouping.var]] <- stringr::str_replace_all(seu@meta.data[[grouping.var]], "[(]", "")
+      seu@meta.data[[grouping.var]] <- stringr::str_replace_all(seu@meta.data[[grouping.var]], "[)]", "")
+    }
 
     peaks <- CallPeaks(seu, 
       group.by = grouping.var,
       outdir = "./data/raw/macs-peaks",
-      cleanup=FALSE,
-      # macs2.path = my.macs2.path)
+      cleanup=FALSE,  
+      macs2.path = my.macs2.path,
+      verbose = TRUE
+    )
     
     # dont want to lose the older peaks we had when peaks were called all together
     if(!is.null(grouping.var)){
@@ -97,23 +105,30 @@ CallMyPeaks <- function(seu, fragpath=NULL,grouping.var=NULL,my.macs2.path=NULL,
 }
 
 # performing classical normalization and dimensionality reduction
-Preprocess.and.Reduce.Dims <- function(seu, harmony=FALSE, harmony.vars = NULL, vars.to.regress=NULL, residual.features = NULL, residual.peaks=NULL){
+Preprocess.and.Reduce.Dims <- function(seu, harmony=FALSE, 
+                                        rna.pcs=30, atac.pcs=30, harmony.vars = NULL, 
+                                        rna.theta = 0.5, atac.theta = 0.5,
+                                        vars.to.regress=NULL, residual.features = NULL, 
+                                        residual.peaks=NULL){
     require(Seurat)
     require(Signac)
 
     # RNA analysis
     DefaultAssay(seu) <- "RNA"
     seu <- SCTransform(seu, verbose = FALSE, residual.features = residual.features,
-       vars.to.regress = vars.to.regress) %>% RunPCA(npc = 30) 
-
+       vars.to.regress = vars.to.regress) %>% RunPCA(npc = rna.pcs, verbose = FALSE) 
+    
+    dims.to.use <- 1:rna.pcs
     if(harmony){
       require(harmony)
       message("Running harmony integration on RNA: ", harmony.vars)
-      seu <- RunHarmony(seu, group.by.vars = harmony.vars, reduction = "pca", assay.use = "SCT", reduction.save = "rna.harmony", project.dim = FALSE, theta = 1)
+      seu <- RunHarmony(seu, group.by.vars = harmony.vars, reduction = "pca", assay.use = "SCT", dims.use = 1:rna.pcs, reduction.save = "rna.harmony", project.dim = FALSE, theta = rep(rna.theta, length(harmony.vars)), max_iter = 25)
+      dims.to.use <- 1:rna.pcs
     }
     reduction.to.use <- ifelse(harmony, "rna.harmony", "pca")
-    seu <- seu %>% RunUMAP(dims = 1:30, reduction = reduction.to.use, reduction.name = "umap.rna", reduction.key = 'rnaUMAP_')
+    seu <- seu %>% RunUMAP(dims = dims.to.use, reduction = reduction.to.use, reduction.name = "umap.rna", reduction.key = 'rnaUMAP_', verbose = FALSE)
 
+    message("RNA analysis of ",seu@project.name," complete. Moving on to ATAC analysis")
     # ATAC analysis
     # We exclude the first dimension as this is typically correlated with sequencing depth
     if("peaks" %in% names(seu@assays)){
@@ -121,34 +136,40 @@ Preprocess.and.Reduce.Dims <- function(seu, harmony=FALSE, harmony.vars = NULL, 
     } else {
       DefaultAssay(seu) <- "ATAC"
     }
-    seu <- RunTFIDF(seu)
-    seu <- FindTopFeatures(seu, min.cutoff = 'q10')
-    seu <- RunSVD(seu, n = 100, features = residual.peaks)
+    seu <- RunTFIDF(seu, verbose = FALSE)
+    seu <- FindTopFeatures(seu, min.cutoff = 'q50', verbose = FALSE)
+    seu <- RunSVD(seu, n = atac.pcs, features = residual.peaks, verbose = FALSE)
 
-    # if(harmony){
-    # message("Running harmony integration on ATAC: ", harmony.vars)
-    # # seu <- ScaleData(seu, assay = "ATAC")
-    # seu <- RunHarmony(seu, group.by.vars = harmony.vars, reduction = "lsi",assay.use = "ATAC", dims.use = 2:50, reduction.save = "atac.harmony", project.dim = FALSE)
-    # }
-    # reduction.to.use <- ifelse(harmony, "atac.harmony", "lsi")
-    reduction.to.use <- "lsi"
-    seu <- RunUMAP(seu, reduction = reduction.to.use, dims = 2:100, reduction.name = "umap.atac", reduction.key = "atacUMAP_")
+    dims.to.use <- 1:atac.pcs
+    if(harmony){
+    message("Running harmony integration on ATAC: ", harmony.vars)
+    # seu <- ScaleData(seu, assay = "ATAC")
+    seu <- RunHarmony(seu, group.by.vars = harmony.vars, reduction = "lsi",assay.use = "peaks", dims.use = 2:atac.pcs, reduction.save = "atac.harmony", project.dim = FALSE, theta = rep(atac.theta, length(harmony.vars)), max_iter = 25)
+    dims.to.use <- 1:(atac.pcs - 1)
+    }
+    reduction.to.use <- ifelse(harmony, "atac.harmony", "lsi")
+    seu <- RunUMAP(seu, reduction = reduction.to.use, dims = dims.to.use, reduction.name = "umap.atac", reduction.key = "atacUMAP_", verbose = FALSE)
+
+    message("ATAC analysis of ",seu@project.name," complete.")
     return(seu)
 }
 
 # constructing the WNN grapoh that incorporates both ATAC and RNA reduction
-ConstructWNNGraph <- function(seu, harmony = FALSE, resolution = 0.8){
+ConstructWNNGraph <- function(seu, harmony = FALSE, resolution = 0.8, rna.pcs=30, atac.pcs=30){
     require(Seurat)
     require(Signac)
   if(harmony){
-    # reduction_list <- list("rna.harmony", "atac.harmony")
-    reduction_list <- list("rna.harmony", "lsi")
+    reduction_list <- list("rna.harmony", "atac.harmony")
+    dims.to.use <- list(c(1:rna.pcs), c(1:(atac.pcs - 1)))
   } else {
     reduction_list <-  list("pca", "lsi")
+    dims.to.use <- list(c(1:rna.pcs), c(2:atac.pcs))
   }
-  seu <- FindMultiModalNeighbors(seu, reduction.list = reduction_list, dims.list = list(1:30, 2:100))
-  seu <- RunUMAP(seu, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_")
+  message("Constructing WNN graph.")
+  seu <- FindMultiModalNeighbors(seu, reduction.list = reduction_list, dims.list = dims.to.use, verbose = FALSE)
+  seu <- RunUMAP(seu, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_", verbose = FALSE)
   seu <- FindClusters(seu, graph.name = "wsnn", algorithm = 3, resolution = resolution, verbose = FALSE)
+  message("WNN graph complete.")
   return(seu)
 }
 
@@ -161,10 +182,11 @@ LinkMyPeaks <- function(seu, genes = NULL, peak.genome,distance.to.use=1000000){
   # seu <- LinkPeaks(seu, peak.assay = "peaks", expression.assay = "RNA", distance = 5000, score_cutoff = 0.1)
   # seu <- FindVariableFeatures(seu, assay = "RNA")
   # seu <- LinkPeaks(seu, peak.assay = "peaks", expression.assay = "RNA", genes.use = seu@assays[["RNA"]]@var.features, distance = 10000)
+  seu <- NormalizeData(seu, assay = "RNA")
   seu <- 
     LinkPeaks(seu, 
       peak.assay = "peaks", 
-      expression.assay = "SCT", 
+      expression.assay = "RNA", 
       genes.use = genes,
       distance = distance.to.use)
   return(seu)

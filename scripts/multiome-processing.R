@@ -39,18 +39,20 @@ options(future.rng.onMisuse = "ignore")
 # options(future.globals.maxSize = 400000*1024^2)
 # options$future.globals.maxSize
 # parrallelize the processing
-plan(multicore, workers = as.numeric(future::availableCores()))
+plan("multicore", workers = as.numeric(future::availableCores()))
 plan()
 
 typeof(argv$RunHarmony)
-
+# .libPaths(c("~/R/x86_64-pc-linux-gnu-library/4.2/", .libPaths()))
+            
 # set up and load in R libraries needed for analysis
+library(EnsDb.Hsapiens.v86, quietly=TRUE)
+library(BSgenome.Hsapiens.UCSC.hg38)
 library(Seurat, quietly=TRUE)
 library(Signac, quietly=TRUE)
-library(EnsDb.Hsapiens.v86, quietly=TRUE)
 library(dplyr, quietly=TRUE)
 library(ggplot2, quietly=TRUE)
-library(enrichR, quietly=TRUE)
+# library(enrichR, quietly=TRUE)
 
 # source in wrapper functions
 source("scripts/functions.R")
@@ -61,10 +63,10 @@ samplesheet <- read.csv(samplesheet)
 samples <- samplesheet$sampleName
 
 # load in annotation files for peaks and ranges
-my.annotation <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86)
-seqlevelsStyle(my.annotation) <- "UCSC"
-peak.genome <- BSgenome.Hsapiens.NCBI.GRCh38::BSgenome.Hsapiens.NCBI.GRCh38
-seqlevelsStyle(peak.genome) <- "UCSC"
+annotation <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86::EnsDb.Hsapiens.v86)
+seqlevels(annotation) <- paste0('chr', seqlevels(annotation))
+peak.genome <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+# seqlevels(peak.genome) <- paste0('chr', seqlevels(peak.genome))
 
 # load in data if desired
 if(!(argv$RDS.file.in == "NA")){
@@ -154,10 +156,10 @@ if("callpeaks" %in% pipelines.to.run){
             function(obj){
                 if(argv$grouping.var == "NA"){
                     # obj <- CallMyPeaks(obj)
-                    obj <- CallMyPeaks(obj, my.macs2.path=argv$my.macs.path)
+                    obj <- CallMyPeaks(obj, my.macs2.path=argv$my.macs.path, my.annotation = annotation)
                 } else {
                     # obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var)
-                    obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var, my.macs2.path=argv$my.macs.path)
+                    obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var, my.macs2.path=argv$my.macs.path, my.annotation = annotation)
                 } 
                 return(obj)
             })
@@ -170,8 +172,8 @@ if("qc" %in% pipelines.to.run){
 
     pdf(file = paste0("output/plots/", argv$project_prefix, "-qc-plots.pdf"),
         height = 8, width = 12)
-    list.of.vars <- list("1" = c("nCount_RNA",  "nCount_ATAC"),
-                     "2" = c("nFeature_RNA","nFeature_ATAC"),
+    list.of.vars <- list("1" = c("nCount_RNA",  "nCount_peaks"),
+                     "2" = c("nFeature_RNA","nFeature_peaks"),
                      "3" = "percent.mt",
                      "4" = c("nucleosome_signal" ,"TSS.enrichment"))
     p.list <-
@@ -192,6 +194,14 @@ if("qc" %in% pipelines.to.run){
         return(p)
     })
     print(p.list)
+
+    density.scatter.list <- 
+        lapply(obj.list, 
+        function(seu){
+            p <- FeatureScatter(seu, feature1 = 'nCount_peaks', feature2 = 'TSS.enrichment')
+            return(p)
+        })
+    print(density.scatter.list)
 
     # preprocessing
     obj.list <- lapply(obj.list,
@@ -233,10 +243,11 @@ if ("filter" %in% pipelines.to.run) {
 
     obj.list <- lapply(obj.list, function(seu) {
         md <- seu@meta.data
+        message("Filtering: ", seu@project.name)
 
         # identify clusters to remove entirely
-        clus.to.remove <- as.character(qc.df$cluster.to.remove[which(seu@project.name == qc.df$sampleName)])
-        if(clus.to.remove != "NA"){
+        clus.to.remove <- unique(as.character(qc.df$cluster.to.remove[which(seu@project.name == qc.df$sampleName)]))
+        if(!(is.na(clus.to.remove))){
             clus.to.remove <- as.numeric(unlist(strsplit(clus.to.remove, split = ";")))
             cells.in.clusters.to.remove <- rownames(md)[md$seurat_clusters %in% clus.to.remove]
         } else {
@@ -281,24 +292,31 @@ if ("filter" %in% pipelines.to.run) {
 # construct WNN graphs 
 if("cluster" %in% pipelines.to.run){
     library(clustree, quietly=TRUE)
-    message("Running Clustering Pipeline")
+    message("Running Clustering Pipeline.")
+    obj.list <- lapply(obj.list, function(obj){
+        obj@project.name <- obj$cell.lineage[1]
+        return(obj)
+    })
+
     obj.list <- 
         lapply(obj.list, 
             function(obj){
                 obj <- Preprocess.and.Reduce.Dims(obj, 
-                                                harmony = argv$RunHarmony)
+                                                harmony = argv$RunHarmony,
+                                                harmony.vars = "orig.ident")
                 obj <- ConstructWNNGraph(obj, 
                                         harmony = argv$RunHarmony,
                                         resolution = seq(0,1,0.1))
                 return(obj)
             })
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-cluster-obj-list.RDS"))
     
     # plots to help decide resolution to use
     lapply(obj.list, function(obj){        
-        pdf(file = paste0("output/plots/", argv$project_prefix, "-cluster-plots.pdf"),
+        pdf(file = paste0("output/plots/", argv$project_prefix, "-",obj@project.name, "-cluster-plots.pdf"),
             height = 8, width = 12)
             
-        print(clustree(obj@meta.data, prefix = "wsnn_res."))
+        # print(clustree(obj@meta.data, prefix = "wsnn_res."))
         print(DimPlot(obj, reduction = "wnn.umap", group.by = paste0("wsnn_res.", seq(0.1, 1, 0.1)), label = T) & NoLegend())
         p1 <- DimPlot(obj, reduction = "pca", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("PCA")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
         p2 <- DimPlot(obj, reduction = "umap.rna", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("RNA")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
@@ -344,31 +362,86 @@ if("cluster" %in% pipelines.to.run){
     saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-cluster-obj-list.RDS"))
 }
 
+# perform sub-clustering analysis on a list of objects
+if("subcluster" %in% pipelines.to.run){
+    message("Running sub-clustering Pipeline.")
+    obj.list <- SplitObject(obj.list[[1]], split.by = "cell.lineage")
+    obj.list <- lapply(obj.list, function(obj){
+        message("Subclustering: ", obj$cell.lineage[1])
+        obj@project.name <- obj$cell.lineage[1]
+        mini.obj.list <- SplitObject(obj, split.by = "orig.ident")
+        for(i in 1:length(mini.obj.list)){
+            message("Subclustering: ", mini.obj.list[[i]]$cell.lineage[1], "-", mini.obj.list[[i]]$orig.ident[1])
+            mini.obj.list[[i]] <- subset(mini.obj.list[[i]], percent.mt < 30 & nFeature_peaks >= 1000 & nFeature_SCT >= 500)
+            mini.obj.list[[i]][["peaks"]]@fragments <- mini.obj.list[[i]][["peaks"]]@fragments[i]
+            mini.obj.list[[i]] <- RunTFIDF(mini.obj.list[[i]], assay = "peaks")
+            mini.obj.list[[i]] <- FindTopFeatures(mini.obj.list[[i]], min.cutoff = 'q50', assay = "peaks", verbose = FALSE)
+        }
+        var.peaks <- lapply(
+            mini.obj.list, function(mini.obj){
+            which.variable <- rownames(mini.obj[["peaks"]]) %in% VariableFeatures(mini.obj)
+            return(mini.obj[["peaks"]]@ranges[which.variable, ])
+        })
+        residual.peaks <- lapply(var.peaks, paste0)
+        residual.peaks.to.use <- names(table(unlist(residual.peaks)))[table(unlist(residual.peaks)) == 6]
+
+        # residual.peaks <- GenomicRanges::reduce(unlist(GenomicRanges::GRangesList(var.peaks)))
+        # residual.peaks.string <- paste0(residual.peaks)
+        residual.peaks.string <- stringr::str_replace(residual.peaks.to.use, pattern = ":", replacement = "-")
+
+        residual.features <- lapply(mini.obj.list,
+                                    function(mini.obj){
+                                    # mini.obj <- subset(mini.obj, percent.mt < 30 & nFeature_peaks >= 1000 & nFeature_SCT >= 500)
+                                    DefaultAssay(mini.obj) <- "RNA"
+                                    mini.obj <- SCTransform(mini.obj) 
+                                    res.feats <- VariableFeatures(mini.obj)
+                                    return(res.feats)}
+                                    )
+        residual.features.to.use <- names(table(unlist(residual.features)))[table(unlist(residual.features)) >= 5]
+
+        merged.obj <- Preprocess.and.Reduce.Dims(obj, 
+                harmony = TRUE,
+                harmony.vars = c("insitution", "orig.ident"),
+                residual.features = residual.features.to.use,
+                rna.pcs = 30, 
+                atac.pcs = 30,
+                rna.theta = 10,
+                atac.theta = 10,
+                residual.peaks =  residual.peaks.string,
+                vars.to.regress = c("insitution", "orig.ident"))
+
+        merged.obj <- ConstructWNNGraph(merged.obj, 
+                                    harmony = TRUE, 
+                                    rna.pcs = 30, 
+                                    atac.pcs = 30,
+                                    resolution = 0.4)
+
+        message("Completed subclustering of ", merged.obj$cell.lineage[1])
+        return(merged.obj)
+    })
+    saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-subcluster-obj-list.RDS"))
+}
+
 # merge objects and create conserved peaks across objects
 if("merge" %in% pipelines.to.run){
     message("Running Merging Pipeline")
-    # peak paths
-    peak.paths <- paste(
-        samplesheet$path,
-        "atac_peaks.bed",
-        sep = "/"
-    )
-
-    # peak list
-    peak.list <- lapply(peak.paths, rtracklayer::import)
-    names(peak.list) <- samplesheet$sampleName
-    peak.list <- lapply(peak.list, function(peak.object){
-                peak.object <- keepStandardChromosomes(peak.object, pruning.mode="coarse")
-                return(peak.object)
-        })
+    peak.list <- lapply(obj.list, function(seu){
+        assay.to.use <- "ATAC"
+        if(!(assay.to.use %in% names(seu@assays))){
+            assay.to.use <- "peaks"
+        }
+        peak.granges <- seu[[assay.to.use]]@ranges
+        return(peak.granges)
+    })
 
     # intersecting the peak list
     combined.peaks <- reduce(unlist(GRangesList(peak.list)))
-
+    
     # Filter out bad peaks based on length
     peakwidths <- width(combined.peaks)
     combined.peaks <- combined.peaks[peakwidths  < 10000 & peakwidths > 20]
-
+    combined.peaks <- keepStandardChromosomes(combined.peaks, pruning.mode = "coarse")
+    
     frag.paths <- lapply(obj.list, function(seu){
         assay.to.use <- "ATAC"
         if(!(assay.to.use %in% names(seu@assays))){
@@ -410,7 +483,7 @@ if("merge" %in% pipelines.to.run){
             CreateChromatinAssay(
                     counts = feat.mat.list[[f.path.name]], 
                     fragments = frag.list[[f.path.name]], 
-                    annotation = my.annotation)
+                    annotation = annotation)
         return(seu)
     })
 
@@ -424,17 +497,18 @@ if("merge" %in% pipelines.to.run){
     # create union of variable genes
     residual.features.to.use <- Reduce(intersect, lapply(obj.list, function(obj){return(obj[["SCT"]]@var.features)}))
 
-    # create union of variable peaks
-    top.feats.list <- lapply(obj.list, function(seu){
-        DefaultAssay(seu) <- "peaks"
-        seu <- RunTFIDF(seu)
-        seu <- FindTopFeatures(seu, min.cutoff = "q50")
-        var.peaks <- seu[["peaks"]]@var.features
-        return(var.peaks)
-    })
-    residual.peaks.to.use <- Reduce(intersect, top.feats.list)
-    message("There are: ", length(residual.peaks.to.use), " residual peaks found.")
-
+    # # create union of variable peaks
+    # top.feats.list <- lapply(obj.list, function(seu){
+    #     DefaultAssay(seu) <- "peaks"
+    #     seu <- RunTFIDF(seu)
+    #     seu <- FindTopFeatures(seu, min.cutoff = "q50")
+    #     var.peaks <- seu[["peaks"]]@var.features
+    #     return(var.peaks)
+    # })
+    # residual.peaks.to.use <- Reduce(intersect, top.feats.list)
+    # message("There are: ", length(residual.peaks.to.use), " residual peaks found.")
+    residual.peaks.to.use <- NULL
+    
     # rerun the clustering on the merged object
     if(argv$RunHarmony){
         message("RunHarmony flagged as TRUE")
@@ -451,31 +525,34 @@ if("merge" %in% pipelines.to.run){
         vars.to.regress = NULL)
     merged.obj <- ConstructWNNGraph(merged.obj, 
                                     harmony = argv$RunHarmony, 
-                                    resolution = 0.3)
+                                    resolution = seq(0,1,0.1))
     merged.obj <- list(merged.obj)
-    saveRDS(merged.obj, file = paste0(argv$outfilename, "-merged-obj-list.RDS"))
+    saveRDS(merged.obj, file = paste0("output/RDS-files/", argv$project_prefix,"-merged-obj-list-improved.RDS"))
 }
 
 # link peaks to genes
 if("linkpeaks" %in% pipelines.to.run){
+    future::plan("sequential")
     obj.list <- 
         lapply(obj.list,
             function(obj){
                     Idents(obj) <- argv$grouping.var
-                    DefaultAssay(obj) <- "SCT"
-                    obj <- PrepSCTFindMarkers(obj)
-                    M <- FindAllMarkers(obj,
-                                        only.pos = TRUE)
-                    write.csv(M, file = paste0("output/de-genes-",argv$grouping.var,".csv"), row.names = T)
+                    # DefaultAssay(obj) <- "SCT"
+                    # obj <- PrepSCTFindMarkers(obj)
+                    # M <- FindAllMarkers(obj,
+                    #                     only.pos = TRUE)
+                    # write.csv(M, file = paste0("output/de-genes-",argv$grouping.var,".csv"), row.names = T)
 
-                    genes.to.link <- M %>% filter(p_val_adj < 0.1) %>% arrange(cluster, desc(avg_log2FC)) %>% pull(gene)
+                    # genes.to.link <- M %>% filter(p_val_adj < 0.1) %>% arrange(cluster, desc(avg_log2FC)) %>% pull(gene)
+                    genes.to.link <- NULL
                     obj <- LinkMyPeaks(obj,
                                         genes = genes.to.link,
-                                        distance.to.use = 2e6,
+                                        distance.to.use = 250001,
                                         peak.genome = peak.genome)
+                    gc()
                     return(obj)
             })
-    saveRDS(obj.list, file = paste0(argv$outfilename, "-linked-obj-list.RDS"))
+    saveRDS(obj.list, file = paste0("output/RDS-files/",argv$project_prefix, "-250-linked-obj-list.RDS"))
 }
 
 # footprinting TF activity by motifs
