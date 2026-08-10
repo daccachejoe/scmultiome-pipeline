@@ -7,7 +7,11 @@
 # args3 = codna_env name
 
 # only export is used right now, better to export meta data in csv file
-.libPaths(c(.libPaths(),"/gpfs/data/naiklab/jd5457/R/x86_64-pc-linux-gnu-library/4.2")) # will likely have to change this path 
+source("scripts/lib/config.R")
+load_pipeline_config()
+if (nzchar(Sys.getenv("r_libs_personal_path"))) {
+  .libPaths(c(.libPaths(), Sys.getenv("r_libs_personal_path")))
+}
 args = commandArgs(trailingOnly=TRUE)
 
 library(sceasy)

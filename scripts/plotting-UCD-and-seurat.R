@@ -1,4 +1,8 @@
-.libPaths(c(.libPaths(),"/gpfs/data/naiklab/jd5457/R/x86_64-pc-linux-gnu-library/4.2"))
+source("scripts/lib/config.R")
+load_pipeline_config()
+if (nzchar(Sys.getenv("r_libs_personal_path"))) {
+  .libPaths(c(.libPaths(), Sys.getenv("r_libs_personal_path")))
+}
 
 library(dplyr)
 library(ggplot2)

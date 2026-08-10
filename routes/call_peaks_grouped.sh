@@ -1,11 +1,10 @@
 #!/bin/bash
 
 if [ "$SCHEDULER" == "slurm" ]; then
-    module load r/4.1.2
+    module load "$slurm_r_module"
     module load macs2
 elif [ "$SCHEDULER" == "lsf" ]; then
-    module load R/4.2.0
-    # module load macs/2.1.0
+    module load "$lsf_r_module"
 else
     echo "No job scheduler available to submit job: $script"
 fi

@@ -1,0 +1,47 @@
+# scmultiome-pipeline machinery config
+#
+# Copy this file to config/pipeline.config and fill in the values for your
+# HPC account/environment. config/pipeline.config is git-ignored (it holds
+# personal paths), this .example file is the tracked template.
+#
+# This is distinct from configs/ (note the trailing 's') at the repo root,
+# which holds per-project run inputs (samplesheet.csv, qc_df.csv, etc.) that
+# you edit for every new project. This file is machinery/environment setup
+# you fill in once.
+
+# ---- Project ----
+project_prefix=my-project-prefix
+
+# ---- Species / genome (used to pick annotation packages + reference files) ----
+# One of: human | mouse
+species=human
+# human -> hg38, mouse -> mm10
+genome=hg38
+
+# ---- Conda environments ----
+conda_env_name=sc-multiome-pipeline-env
+personal_anaconda_path=/path/to/miniconda3/etc/profile.d/conda.sh
+sceasy_env_name=sceasy-env
+UCD_env_name=ucd-env
+scenicplus_env_name=scenicplus-env
+
+# ---- Tool paths ----
+my_macs_path=/path/to/conda/envs/macs-env/bin/macs3
+create_cistarget_databases_path=/path/to/conda/envs/scenicplus-env/create_cisTarget_databases
+create_cistarget_databases_dir=/path/to/conda/envs/create_cisTarget_databases
+
+# ---- Reference data ----
+# Human/hg38 defaults shown; set genome_fasta/celltype_reference_h5ad to the
+# mouse/mm10 equivalents if species=mouse.
+genome_fasta=/path/to/reference_genome/refdata-gex-GRCh38-2020-A/fasta/genome.fa
+celltype_reference_h5ad=/path/to/shared/reference/Unicell_Reference.h5ad
+r_libs_personal_path=/path/to/R/x86_64-pc-linux-gnu-library/4.2
+scenicplus_tmp_dir=/path/to/scratch/your_username
+
+# ---- Scheduler ----
+slurm_partition=a100_short
+lsf_project=acc_naiklab
+lsf_queue=premium
+# R module loaded on LSF submission (kept consistent across all routes)
+lsf_r_module=R/4.2.0
+slurm_r_module=r/4.1.2

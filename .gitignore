@@ -1,0 +1,18 @@
+# Personal/HPC-specific pipeline config (copy config/pipeline.config.example)
+config/pipeline.config
+
+# Data and outputs (per-project, not part of the repo)
+data/raw/*
+!data/raw/.gitkeep
+output/RDS-files/*
+!output/RDS-files/.gitkeep
+output/plots/*
+!output/plots/.gitkeep
+output/tables/*
+!output/tables/.gitkeep
+output/ucd/*
+!output/ucd/.gitkeep
+scripts/outs/*
+!scripts/outs/.gitkeep
+
+.DS_Store

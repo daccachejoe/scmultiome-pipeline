@@ -19,7 +19,7 @@ if [ -s "configs/resolution_to_use.txt" ]; then
     python scripts/ucd-script.py \
         --resolution $resolution \
         --input_file ./output/ucd/$project_prefix-cluster-obj-list.h5ad \
-        --reference_file /gpfs/data/naiklab/SHARED_DATA/Haniffa_Healthy_Only_Updated_Labels_Unicell_Reference.h5ad 
+        --reference_file "$celltype_reference_h5ad"
     
     Rscript scripts/plotting-UCD-and-seurat.R /output/ucd/cellmetadata-unbiased.csv $resolution
     echo UCDeconvolve is complete. Exiting. 

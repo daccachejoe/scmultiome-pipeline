@@ -10,7 +10,7 @@ Rscript scripts/convert_seurat_to_h5ad.R \
    $sceasy_env_name
 
 # then we run a script in R to export the necessary data
-Rscript scripts/export_scenicplus_data.r \
+Rscript scripts/export_scenicplus_data.R \
     output/RDS-files/$project_prefix-grouped-peaks-callpeaks-obj-list.RDS
 
 conda deactivate
@@ -45,7 +45,7 @@ module -q load dataark
 
 echo "Generating fasta's of peaks for cisTarget databases"
 REGION_BED="data/raw/macs-peaks/grouped-peaks.bed"
-GENOME_FASTA="/sc/arion/projects/data-ark/Public_Unrestricted/reference_genome/single-cell/10xgenomics-prebuild/Human-reference/current/refdata-gex-GRCh38-2020-A/fasta/genome.fa"
+GENOME_FASTA="$genome_fasta"
 CHROMSIZES="data/scenicplus/jd_chromsizes"
 DATABASE_PREFIX=${project_prefix}_500_bg_padding
 SCRIPT_DIR=${create_cistarget_databases_path}
