@@ -6,7 +6,7 @@ and sceasy pin conflicting dependency versions.
 
 | Environment (config key)             | Purpose                                   |
 | ------------------------------------- | ------------------------------------------ |
-| `conda_env_name`                      | Main Seurat/Signac R analysis (trunk stages 00-05, downstream subcluster/linkpeaks) |
+| `conda_env_name`                      | Main Seurat/Signac R analysis (trunk stages 00-06, downstream subcluster) |
 | `sceasy_env_name`                      | Converts Seurat objects to AnnData (`.h5ad`) |
 | `UCD_env_name`                         | UCDeconvolve cell-type calling (stage 03)  |
 | `scenicplus_env_name`                  | SCENIC+ regulon inference (downstream branch, extra environments) |
@@ -21,7 +21,7 @@ cp config/pipeline.config.example config/pipeline.config
 
 ## 1. Main analysis environment (`conda_env_name`)
 
-The main pipeline (trunk stages 00-05, plus downstream subcluster/linkpeaks) runs under your HPC's R module,
+The main pipeline (trunk stages 00-06, plus the downstream subcluster branch) runs under your HPC's R module,
 not a conda R install: SLURM jobs load `slurm_r_module` (default `r/4.1.2`)
 and LSF jobs load `lsf_r_module` (default `R/4.2.0`) from `config/pipeline.config`
 -- keep these consistent with whatever R module is actually available on

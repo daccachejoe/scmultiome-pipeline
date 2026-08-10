@@ -28,7 +28,7 @@ The pipeline has a **trunk** (run in strict order) and **downstream branches**
 a `run/runmultiome <name>` command that submits a SLURM/LSF job running the
 corresponding `routes/*.sh` script.
 
-### Trunk (00 -> 05, strict order)
+### Trunk (00 -> 06, strict order)
 
 | # | `run/runmultiome` stage | What it does | Route | Key script(s) |
 |---|---|---|---|---|
@@ -37,20 +37,27 @@ corresponding `routes/*.sh` script.
 | 02 | `run_merged_pipeline` | Filter samples per `configs/qc_df.csv`, merge into one object with a consensus peak set + clustering | `routes/02_merge_pipeline.sh` | `scripts/seurat_signac_pipeline.R` |
 | 03 | `identify_celltypes` | UCDeconvolve-assisted cell type calling (human then fills in `configs/cluster_labels.csv`) | `routes/03_identify_celltypes.sh` | `scripts/03_convert_seurat_to_h5ad.R`, `scripts/03_ucd_deconvolve.py`, `scripts/03_plot_ucd_results.R` |
 | 04 | `label_celltypes` | Apply your cluster -> cell-type labels (`configs/cluster_labels.csv`) | `routes/04_label_celltypes.sh` | `scripts/04_label_celltypes.R` |
-| 05 | `call_peaks_grouped` | Re-call ATAC peaks grouped by cell type -- **branch point** | `routes/05_call_peaks_grouped.sh` | `scripts/seurat_signac_pipeline.R` |
+| 05 | `call_peaks_grouped` | Re-call ATAC peaks grouped by cell type -- **branch point for the optional stages below** | `routes/05_call_peaks_grouped.sh` | `scripts/seurat_signac_pipeline.R` |
+| 06 | `linkpeaks` | Link ATAC peaks to nearby genes, in parallel (one job per group + a dependent merge job) | `routes/06_linkpeaks.sh` | `scripts/06a_linkpeaks_split.R`, `06b_linkpeaks_group.R`, `06c_linkpeaks_merge.R` |
 
-### Downstream branches (independent of each other, run any/all after stage 05)
+Peak-gene linking (06) is part of the trunk because it's a near-universal
+step in multiome analysis, not something most users would skip.
+
+### Downstream branches (optional, independent of each other, run any/all after stage 05)
 
 | `run/runmultiome` stage | What it does | Route | Key script(s) |
 |---|---|---|---|
 | `filter_and_cluster` | Subcluster within cell lineages (Harmony batch correction) | `routes/downstream/subcluster.sh` | `scripts/seurat_signac_pipeline.R` |
-| `linkpeaks` | Link ATAC peaks to nearby genes, in parallel (one job per group + a dependent merge job) | `routes/downstream/linkpeaks.sh` | `scripts/downstream/linkpeaks_split.R`, `linkpeaks_group.R`, `linkpeaks_merge.R` |
 | `run_scenicplus` (extra environments required) | SCENIC+ regulon inference | `routes/downstream/run_scenicplus.sh` | `scripts/downstream/export_scenicplus_data.R`, `reformat_anndata.py`, `scenicplus_pipeline.py` |
 
+These are exploratory or heavyweight extras (a closer look at a specific
+lineage, or a separate regulon-inference toolchain), unlike linkpeaks --
+so they stay outside the trunk and don't run unless you ask for them.
+
 Output RDS checkpoints follow `{project_prefix}-{step}-{name}-obj[-list].RDS`
-in `output/RDS-files/` for trunk stages (self-documenting which stage
-produced them); downstream branch outputs drop the step number since
-they're not part of a fixed sequence.
+in `output/RDS-files/` for trunk stages, including linkpeaks (06)
+(self-documenting which stage produced them); downstream branch outputs
+drop the step number since they're not part of a fixed sequence.
 
 ### Why per-sample objects, merged later?
 
@@ -68,25 +75,26 @@ Don't "fix" this into an early merge.
 .
 ├── run/
 │   └── runmultiome                # single CLI entry point (dispatcher)
-├── routes/                        # trunk stages, numbered 00-05 (strict order)
+├── routes/                        # trunk stages, numbered 00-06 (strict order)
 │   ├── 00_setup_dirs.sh
 │   ├── 00_install.sh
 │   ├── 01_seurat_preprocess.sh
 │   ├── 02_merge_pipeline.sh
 │   ├── 03_identify_celltypes.sh
 │   ├── 04_label_celltypes.sh
-│   ├── 05_call_peaks_grouped.sh   # branch point: cell types called, peaks re-called
-│   └── downstream/                # independent branches, run any/all after 05
+│   ├── 05_call_peaks_grouped.sh   # branch point for the optional stages below
+│   ├── 06_linkpeaks.sh
+│   └── downstream/                # optional branches, run any/all after 05
 │       ├── subcluster.sh
-│       ├── linkpeaks.sh
 │       └── run_scenicplus.sh      # extra environments required
 ├── scripts/                       # R/Python analysis code
 │   ├── seurat_signac_pipeline.R   # engine: arg parsing + config/species setup + dispatch
 │   ├── functions.R                # shared Seurat/Signac wrapper functions
 │   ├── 03_convert_seurat_to_h5ad.R, 03_ucd_deconvolve.py, 03_plot_ucd_results.R
 │   ├── 04_label_celltypes.R
+│   ├── 06a_linkpeaks_split.R, 06b_linkpeaks_group.R, 06c_linkpeaks_merge.R
 │   ├── stages/                    # one file per pipeline stage, sourced by the engine
-│   ├── downstream/                # subcluster/linkpeaks helpers + SCENIC+ scripts
+│   ├── downstream/                # subcluster helper + SCENIC+ scripts
 │   └── lib/                       # shared R helpers (config.R, genome.R, seurat_io.R)
 ├── config/                        # pipeline MACHINERY config -- edit once
 │   ├── pipeline.config.example    # tracked template

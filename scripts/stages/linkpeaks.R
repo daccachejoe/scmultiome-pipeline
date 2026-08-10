@@ -1,7 +1,7 @@
 # Stage: linkpeaks
 # Runs LinkPeaksToGenes on each object in obj.list. For HPC runs, prefer
-# the parallel divide-and-conquer path (routes/downstream/linkpeaks.sh +
-# scripts/downstream/linkpeaks_*.R) over invoking this stage directly --
+# the parallel divide-and-conquer path (routes/06_linkpeaks.sh +
+# scripts/06a/06b/06c_linkpeaks_*.R) over invoking this stage directly --
 # this single-process version is kept for small/interactive use.
 # Sourced by scripts/seurat_signac_pipeline.R.
 
@@ -25,4 +25,4 @@ obj.list <-
                 gc()
                 return(obj)
         })
-saveRDS(obj.list, file = paste0("output/RDS-files/",argv$project_prefix, "-linkpeaks-obj-list.RDS"))
+saveRDS(obj.list, file = paste0("output/RDS-files/",argv$project_prefix, "-06-linkpeaks-obj-list.RDS"))

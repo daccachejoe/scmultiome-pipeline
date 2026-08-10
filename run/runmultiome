@@ -15,12 +15,13 @@ Trunk stages (run in this strict order):
   identify_celltypes    03 - UCDeconvolve-assisted cell type calling
   label_celltypes       04 - apply user-provided cluster labels
   call_peaks_grouped    05 - re-call ATAC peaks grouped by cell type
-                              (branch point: cell types called, peaks re-called)
+  linkpeaks             06 - link ATAC peaks to nearby genes (parallel, one job per group)
 
-Downstream branches (independent of each other, run any/all after stage 05):
+Downstream branches (optional, independent of each other, run any/all
+after stage 05 -- peak-gene linking above is standard; these are
+exploratory/heavyweight extras):
   filter_and_cluster     subcluster within cell lineages
-  linkpeaks              link ATAC peaks to nearby genes
-  run_scenicplus         (optional, extra environments required) SCENIC+ regulon inference
+  run_scenicplus         (extra environments required) SCENIC+ regulon inference
 
 Run per-sample stages, then review outputs in output/, before moving to
 the next stage. See README.md for the full walkthrough.
@@ -112,21 +113,21 @@ call_peaks_grouped() {
     submit_job routes/05_call_peaks_grouped.sh scripts/outs/05-callpeaks-grouped-%J.out 36:00 32000 24
 }
 
-# Downstream branches -- all read stage 05's output independently; run any
-# or all of them in any order once call_peaks_grouped has completed.
+linkpeaks() {
+    echo "Step 06: Linking peaks to genes"
+    submit_job routes/06_linkpeaks.sh scripts/outs/06-linkpeaks-%J.out 36:00 12000 6
+}
+
+# Downstream branches (optional) -- read stage 05's output independently;
+# run any or all of them in any order once call_peaks_grouped has completed.
 
 filter_and_cluster() {
     echo "Downstream branch: subclustering within cell lineages"
     submit_job routes/downstream/subcluster.sh scripts/outs/subcluster-%J.out 36:00 32000 24
 }
 
-linkpeaks() {
-    echo "Downstream branch: linking peaks to genes"
-    submit_job routes/downstream/linkpeaks.sh scripts/outs/linkpeaks-%J.out 36:00 12000 6
-}
-
 run_scenicplus() {
-    echo "Downstream branch (optional, extra environments required): running SCENIC+"
+    echo "Downstream branch (extra environments required): running SCENIC+"
     submit_job routes/downstream/run_scenicplus.sh scripts/outs/scenicplus-%J.out 12:00 40000 32
 }
 
