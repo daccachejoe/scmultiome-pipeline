@@ -1,3 +1,8 @@
+# Not currently sourced/called by any route or by scripts/seurat_signac_pipeline.R.
+# Density-colored scatter plot with no Seurat/Signac built-in equivalent
+# (kept as a legitimate exception to the Seurat-first plotting convention);
+# available for QC scatter plots (e.g. nCount_peaks vs TSS.enrichment) if
+# density coloring beyond FeatureScatter() is needed.
 DensityScatter <- function(
     object,
     x,

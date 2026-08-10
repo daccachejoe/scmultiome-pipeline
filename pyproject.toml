@@ -1,0 +1,31 @@
+[project]
+name = "scmultiome-pipeline"
+version = "2.0.0"
+description = "Single-cell multiome (RNA+ATAC) analysis pipeline"
+requires-python = ">=3.9"
+dependencies = []
+
+# Python dependencies are split by conda env (see config/pipeline.config:
+# UCD_env_name, scenicplus_env_name) since UCDeconvolve and SCENIC+ pin
+# conflicting dependency versions and cannot share one environment.
+# Install with: uv pip install -e ".[ucd]"  (in the UCD_env_name env)
+#               uv pip install -e ".[scenicplus]"  (in the scenicplus_env_name env)
+# then run `uv lock` in each env to produce a real, resolved uv.lock.
+[project.optional-dependencies]
+ucd = [
+    "scanpy",
+    "ucdeconvolve",
+]
+scenicplus = [
+    "scenicplus",
+    "pycisTopic",
+    "pyranges",
+    "anndata",
+    "scanpy",
+    "pandas",
+    "pyyaml",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
