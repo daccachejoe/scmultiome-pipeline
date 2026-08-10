@@ -49,7 +49,6 @@ typeof(argv$RunHarmony)
 # packages, genome, blacklist, and JASPAR taxon ID.
 source("scripts/lib/config.R")
 load_pipeline_config()
-species <- Sys.getenv("species", unset = "human")
 
 library(Seurat, quietly=TRUE)
 library(Signac, quietly=TRUE)
@@ -57,21 +56,12 @@ library(dplyr, quietly=TRUE)
 library(ggplot2, quietly=TRUE)
 # library(enrichR, quietly=TRUE)
 
-if (species == "mouse") {
-    library(EnsDb.Mmusculus.v79, quietly=TRUE)
-    library(BSgenome.Mmusculus.UCSC.mm10, quietly=TRUE)
-    ensdb.to.use <- EnsDb.Mmusculus.v79::EnsDb.Mmusculus.v79
-    genome.to.use <- BSgenome.Mmusculus.UCSC.mm10::BSgenome.Mmusculus.UCSC.mm10
-    blacklist.to.use <- Signac::blacklist_mm10
-    jaspar.taxid <- 10090
-} else {
-    library(EnsDb.Hsapiens.v86, quietly=TRUE)
-    library(BSgenome.Hsapiens.UCSC.hg38, quietly=TRUE)
-    ensdb.to.use <- EnsDb.Hsapiens.v86::EnsDb.Hsapiens.v86
-    genome.to.use <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
-    blacklist.to.use <- Signac::blacklist_hg38_unified
-    jaspar.taxid <- 9606
-}
+source("scripts/lib/genome.R")
+species.info <- load_species_genome()
+ensdb.to.use <- species.info$ensdb
+genome.to.use <- species.info$genome
+blacklist.to.use <- species.info$blacklist
+jaspar.taxid <- species.info$jaspar_taxid
 
 # source in wrapper functions
 source("scripts/functions.R")
