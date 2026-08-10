@@ -46,10 +46,16 @@ CreateMultiomeSeurat <- function(data.dir, my.annotation = annotation, frag.path
 }
 
 # call peaks uisng macs2
-CallMyPeaks <- function(seu, fragpath=NULL,grouping.var=NULL,my.macs2.path=NULL,my.annotation=NULL){
-    require(EnsDb.Hsapiens.v86)
+# blacklist: a Signac blacklist GRanges appropriate for the genome build in
+# use (e.g. Signac::blacklist_hg38_unified for human, Signac::blacklist_mm10
+# for mouse). Defaults to the human hg38 blacklist for backwards compatibility.
+CallMyPeaks <- function(seu, fragpath=NULL,grouping.var=NULL,my.macs2.path=NULL,my.annotation=NULL,blacklist=NULL){
     require(Seurat)
     require(Signac)
+
+    if(is.null(blacklist)){
+      blacklist <- Signac::blacklist_hg38_unified
+    }
 
     atac.assay <- ifelse("ATAC" %in% names(seu@assays), "ATAC", "peaks")
     DefaultAssay(seu) <- atac.assay
@@ -58,7 +64,7 @@ CallMyPeaks <- function(seu, fragpath=NULL,grouping.var=NULL,my.macs2.path=NULL,
     #   fragpath <- fragments[[1]]@path
     # }
     # call peaks using MACS2
-    seqlevelsStyle(blacklist_hg38_unified) <- "NCBI"
+    seqlevelsStyle(blacklist) <- "NCBI"
    if(!is.null(grouping.var)){
       seu@meta.data[[grouping.var]] <- stringr::str_replace_all(seu@meta.data[[grouping.var]], " ", "_")
       seu@meta.data[[grouping.var]] <- stringr::str_replace_all(seu@meta.data[[grouping.var]], "[(]", "")
@@ -85,7 +91,7 @@ CallMyPeaks <- function(seu, fragpath=NULL,grouping.var=NULL,my.macs2.path=NULL,
 
     # remove peaks on nonstandard chromosomes and in genomic blacklist regions
     peaks <- keepStandardChromosomes(peaks, pruning.mode = "coarse")
-    peaks <- subsetByOverlaps(x = peaks, ranges = blacklist_hg38_unified, invert = TRUE)
+    peaks <- subsetByOverlaps(x = peaks, ranges = blacklist, invert = TRUE)
 
     # quantify counts in each peak
     macs2_counts <- FeatureMatrix(
@@ -260,7 +266,8 @@ date.time.append <- function(str, sep = '-', date.format ="%Y_%m_%d_%H_%M_%S") {
 }
 
 # footprint motifs and specific peaks
-FootprintMyPeaks <- function(obj, peaks.to.test, motifs.to.test=NULL, peak.genome=NULL, motif.set=NULL){
+# jaspar.taxid: NCBI taxonomy ID for JASPAR motif lookup (9606 = human, 10090 = mouse)
+FootprintMyPeaks <- function(obj, peaks.to.test, motifs.to.test=NULL, peak.genome=NULL, motif.set=NULL, jaspar.taxid=9606){
   require(motifmatchr)
   require(TFBSTools)
   require(JASPAR2020)
@@ -268,7 +275,7 @@ FootprintMyPeaks <- function(obj, peaks.to.test, motifs.to.test=NULL, peak.genom
   if(is.null(motif.set)){
     motif.set <- getMatrixSet(
       x = JASPAR2020,
-      opts = list(species = 9606, all_versions = TRUE)
+      opts = list(species = jaspar.taxid, all_versions = TRUE)
     )
     # tf.names <- unlist(lapply(motif.set@listData, function(mini.list){return(mini.list@name)}), use.names = F)
     # tf.in.object <- tf.names[tf.names %in% rownames(obj[["RNA"]])]

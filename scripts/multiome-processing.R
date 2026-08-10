@@ -43,16 +43,35 @@ plan("multicore", workers = as.numeric(future::availableCores()))
 plan()
 
 typeof(argv$RunHarmony)
-# .libPaths(c("~/R/x86_64-pc-linux-gnu-library/4.2/", .libPaths()))
-            
-# set up and load in R libraries needed for analysis
-library(EnsDb.Hsapiens.v86, quietly=TRUE)
-library(BSgenome.Hsapiens.UCSC.hg38)
+
+# load pipeline config (config/pipeline.config) for species/genome selection
+# and other machinery settings, then set up species-specific annotation
+# packages, genome, blacklist, and JASPAR taxon ID.
+source("scripts/lib/config.R")
+load_pipeline_config()
+species <- Sys.getenv("species", unset = "human")
+
 library(Seurat, quietly=TRUE)
 library(Signac, quietly=TRUE)
 library(dplyr, quietly=TRUE)
 library(ggplot2, quietly=TRUE)
 # library(enrichR, quietly=TRUE)
+
+if (species == "mouse") {
+    library(EnsDb.Mmusculus.v79, quietly=TRUE)
+    library(BSgenome.Mmusculus.UCSC.mm10, quietly=TRUE)
+    ensdb.to.use <- EnsDb.Mmusculus.v79::EnsDb.Mmusculus.v79
+    genome.to.use <- BSgenome.Mmusculus.UCSC.mm10::BSgenome.Mmusculus.UCSC.mm10
+    blacklist.to.use <- Signac::blacklist_mm10
+    jaspar.taxid <- 10090
+} else {
+    library(EnsDb.Hsapiens.v86, quietly=TRUE)
+    library(BSgenome.Hsapiens.UCSC.hg38, quietly=TRUE)
+    ensdb.to.use <- EnsDb.Hsapiens.v86::EnsDb.Hsapiens.v86
+    genome.to.use <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+    blacklist.to.use <- Signac::blacklist_hg38_unified
+    jaspar.taxid <- 9606
+}
 
 # source in wrapper functions
 source("scripts/functions.R")
@@ -63,9 +82,9 @@ samplesheet <- read.csv(samplesheet)
 samples <- samplesheet$sampleName
 
 # load in annotation files for peaks and ranges
-annotation <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v86::EnsDb.Hsapiens.v86)
+annotation <- GetGRangesFromEnsDb(ensdb = ensdb.to.use)
 seqlevels(annotation) <- paste0('chr', seqlevels(annotation))
-peak.genome <- BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38
+peak.genome <- genome.to.use
 # seqlevels(peak.genome) <- paste0('chr', seqlevels(peak.genome))
 
 # load in data if desired
@@ -155,12 +174,10 @@ if("callpeaks" %in% pipelines.to.run){
         lapply(obj.list, 
             function(obj){
                 if(argv$grouping.var == "NA"){
-                    # obj <- CallMyPeaks(obj)
-                    obj <- CallMyPeaks(obj, my.macs2.path=argv$my.macs.path, my.annotation = annotation)
+                    obj <- CallMyPeaks(obj, my.macs2.path=argv$my.macs.path, my.annotation = annotation, blacklist = blacklist.to.use)
                 } else {
-                    # obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var)
-                    obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var, my.macs2.path=argv$my.macs.path, my.annotation = annotation)
-                } 
+                    obj <- CallMyPeaks(obj, grouping.var=argv$grouping.var, my.macs2.path=argv$my.macs.path, my.annotation = annotation, blacklist = blacklist.to.use)
+                }
                 return(obj)
             })
     saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-callpeaks-obj-list.RDS"))
@@ -561,16 +578,17 @@ if("footprint" %in% pipelines.to.run){
     library(TFBSTools, quietly=TRUE)
     library(JASPAR2020, quietly=TRUE)
 
-    peaks.to.footprint <- readr::read_delim(argv$footprint-peaks, rownames = F)
-    footprint.list <- 
+    peaks.to.footprint <- readr::read_delim(argv[["footprint-peaks"]])
+    footprint.list <-
         lapply(obj.list,
             function(obj){
-                footprint.obj <- 
-                    FootprintMyPeaks(obj, 
+                footprint.obj <-
+                    FootprintMyPeaks(obj,
                         peaks.to.test = peaks.to.footprint,
-                        peak.genome = peak.genome)
+                        peak.genome = peak.genome,
+                        jaspar.taxid = jaspar.taxid)
             })
-    saveRDS(obfootprintj.list, file = paste0(argv$outfilename, "-footprinted-obj-list.RDS"))
+    saveRDS(footprint.list, file = paste0("output/RDS-files/", argv$project_prefix, "-footprinted-obj-list.RDS"))
 }
 
 message("disco complete.")
