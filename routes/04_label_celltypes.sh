@@ -15,7 +15,7 @@ if [[ $(wc -l < "configs/cluster_labels.csv") -gt 1 ]]; then
     Rscript scripts/04_label_celltypes.R \
         configs/cluster_labels.csv \
         $resolution \
-        output/RDS-files/$project_prefix-merged-obj-list.RDS \
+        output/RDS-files/$project_prefix-02-merge-obj-list.RDS \
         $project_prefix
     echo Celltype labelling is complete. Exiting. 
 else

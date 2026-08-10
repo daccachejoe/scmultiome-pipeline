@@ -16,7 +16,7 @@ obj <- obj[[1]]
 ct.df <- read.csv(annotations)
 obj$ct <- ct.df$ct[match(obj@meta.data[[resolution]], ct.df$cluster)]
 obj$ct.spec <- ct.df$ct.spec[match(obj@meta.data[[resolution]], ct.df$cluster)]
-# saveRDS(list(obj), file = paste0("output/RDS-files/",project_prefix,"-annotated-obj-list.RDS"))
+saveRDS(list(obj), file = paste0("output/RDS-files/",project_prefix,"-04-label-celltypes-obj-list.RDS"))
 
 # plotting
 md <- obj@meta.data

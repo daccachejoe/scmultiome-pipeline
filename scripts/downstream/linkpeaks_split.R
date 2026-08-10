@@ -1,9 +1,9 @@
 #!/usr/bin/env Rscript
-# Step 06a: split a merged/annotated object by a grouping variable into one
-# RDS per group, so LinkPeaks can be run in parallel, one job per group
-# (see routes/06_linkpeaks.sh, which orchestrates split -> per-group -> merge).
+# Split a merged/annotated object by a grouping variable into one RDS per
+# group, so LinkPeaks can be run in parallel, one job per group (see
+# routes/downstream/linkpeaks.sh, which orchestrates split -> per-group -> merge).
 #
-# Usage: scripts/06a_linkpeaks_split.R <input.RDS> <grouping.var> <out_prefix>
+# Usage: scripts/downstream/linkpeaks_split.R <input.RDS> <grouping.var> <out_prefix>
 
 suppressMessages(library(Seurat))
 suppressMessages(library(Signac))
@@ -28,12 +28,12 @@ sanitize <- function(x) gsub("[^A-Za-z0-9._-]+", "_", x)
 groups.used <- c()
 for (group.name in names(groups.obj.list)) {
   safe.name <- sanitize(group.name)
-  out.file <- paste0("output/RDS-files/", out.prefix, "-06-linkpeaks-group-", safe.name, "-obj.RDS")
+  out.file <- paste0("output/RDS-files/", out.prefix, "-linkpeaks-group-", safe.name, "-obj.RDS")
   saveRDS(groups.obj.list[[group.name]], file = out.file)
   groups.used <- c(groups.used, safe.name)
   message("Wrote group '", group.name, "' (", ncol(groups.obj.list[[group.name]]), " cells) to ", out.file)
 }
 
-groups.file <- paste0("output/RDS-files/", out.prefix, "-06-linkpeaks-groups.txt")
+groups.file <- paste0("output/RDS-files/", out.prefix, "-linkpeaks-groups.txt")
 writeLines(groups.used, groups.file)
 message("Wrote group list to ", groups.file)

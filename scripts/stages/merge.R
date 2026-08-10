@@ -107,4 +107,4 @@ merged.obj <- ConstructWNNGraph(merged.obj,
                                 harmony = argv$RunHarmony,
                                 resolution = seq(0,1,0.1))
 merged.obj <- list(merged.obj)
-saveRDS(merged.obj, file = paste0("output/RDS-files/", argv$project_prefix,"-02a-merge-obj-list.RDS"))
+saveRDS(merged.obj, file = paste0("output/RDS-files/", argv$project_prefix,"-02-merge-obj-list.RDS"))

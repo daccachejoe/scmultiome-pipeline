@@ -18,4 +18,4 @@ fi
 # R CMD INSTALL .
 
 chmod +x scripts/seurat_signac_pipeline.R
-chmod +x scripts/06a_linkpeaks_split.R scripts/06b_linkpeaks_group.R scripts/06c_linkpeaks_merge.R
+chmod +x scripts/downstream/linkpeaks_split.R scripts/downstream/linkpeaks_group.R scripts/downstream/linkpeaks_merge.R

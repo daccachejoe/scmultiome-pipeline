@@ -10,7 +10,7 @@ Rscript scripts/03_convert_seurat_to_h5ad.R \
    $sceasy_env_name
 
 # then we run a script in R to export the necessary data
-Rscript scripts/optional/07a_export_scenicplus_data.R \
+Rscript scripts/optional/export_scenicplus_data.R \
     output/RDS-files/$project_prefix-grouped-peaks-05-callpeaks-obj-list.RDS
 
 conda deactivate
@@ -18,7 +18,7 @@ conda activate $scenicplus_env_name
 # for some reason, sceasy saves the RNA matrix as a sparse matrix in the AnnData.raw slot
 # to run SCENIC+, we need to convert this to a AnnData in the .raw slot
 # in an interactive is easiest, but run the following lines of code
-python scripts/optional/07b_reformat_anndata.py data/scenicplus/$project_prefix.h5ad data/scenicplus/${project_prefix}_new.h5ad
+python scripts/optional/reformat_anndata.py data/scenicplus/$project_prefix.h5ad data/scenicplus/${project_prefix}_new.h5ad
 # import anndata as ad
 # import scanpy as sc
 # obj=sc.read_h5ad("path/to/file")
@@ -35,7 +35,7 @@ export _JAVA_OPTIONS=-Xmx250g
 echo Running SCENIC+ preprocessing pipeline
 # make sure the prepcocess config file has compute_topics, indentify_enhancers set to True but not runPycisTarget
 config_file=configs/scenicplus-preprocess-config.yml
-python scripts/optional/07c_scenicplus_pipeline.py $config_file
+python scripts/optional/scenicplus_pipeline.py $config_file
 echo SCENIC+ preprocessing complete. Moving on to creating cisTarget databases
 
 # deactivate the scenicplus environment and start up the create cisTargetDB env

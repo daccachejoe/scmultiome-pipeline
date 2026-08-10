@@ -58,4 +58,4 @@ obj.list <- lapply(obj.list, function(obj){
     message("Completed subclustering of ", merged.obj$cell.lineage[1])
     return(merged.obj)
 })
-saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-02b-subcluster-obj-list.RDS"))
+saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-subcluster-obj-list.RDS"))

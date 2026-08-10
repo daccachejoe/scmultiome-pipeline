@@ -21,7 +21,7 @@ obj.list <-
                                     resolution = seq(0,1,0.1))
             return(obj)
         })
-saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-02b-cluster-obj-list.RDS"))
+saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-cluster-obj-list.RDS"))
 
 # plots to help decide resolution to use
 lapply(obj.list, function(obj){
@@ -71,4 +71,4 @@ lapply(obj.list,
         write.csv(M, file = paste0("output/tables/cluster-markers-bound.csv"))
     })
 
-saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-02b-cluster-obj-list.RDS"))
+saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-cluster-obj-list.RDS"))

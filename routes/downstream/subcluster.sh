@@ -1,4 +1,8 @@
 #!/bin/bash
+# Downstream branch: per-lineage subclustering with Harmony batch
+# correction. Reads stage 05's output (cell types called, peaks re-called
+# grouped by cell type) -- independent of the other downstream branches
+# (linkpeaks, SCENIC+), which also branch from stage 05.
 
 if [ "$SCHEDULER" == "slurm" ]; then
     module load "$slurm_r_module"
@@ -19,7 +23,7 @@ if [[ $(wc -l < "configs/qc_df.csv") -gt 0 ]]; then
     scripts/seurat_signac_pipeline.R \
         subcluster \
         configs/samplesheet.csv \
-        --project_prefix $project_prefix-lineage-imrpoved \
+        --project_prefix $project_prefix-lineage-improved \
         -m $my_macs_path \
         --RunHarmony \
         -R output/RDS-files/$project_prefix-grouped-peaks-05-callpeaks-obj-list.RDS \

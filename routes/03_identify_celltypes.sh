@@ -9,7 +9,7 @@ if [ -s "configs/resolution_to_use.txt" ]; then
     conda activate $sceasy_env_name
     
     Rscript scripts/03_convert_seurat_to_h5ad.R \
-        output/RDS-files/$project_prefix-02b-cluster-obj-list.RDS \
+        output/RDS-files/$project_prefix-02-merge-obj-list.RDS \
         ./output/ucd/$project_prefix-cluster-obj-list.h5ad \
         $sceasy_env_name
     

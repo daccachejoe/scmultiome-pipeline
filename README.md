@@ -23,29 +23,39 @@ full list of stages.
 
 ## Pipeline stages
 
-Run in this order. Each stage is a `run/runmultiome <name>` command that
-submits a SLURM/LSF job running the corresponding `routes/*.sh` script.
-Stage 07 is optional and branches off after stage 05.
+The pipeline has a **trunk** (run in strict order) and **downstream branches**
+(run independently, in any order, once the trunk completes). Each stage is
+a `run/runmultiome <name>` command that submits a SLURM/LSF job running the
+corresponding `routes/*.sh` script.
+
+### Trunk (00 -> 05, strict order)
 
 | # | `run/runmultiome` stage | What it does | Route | Key script(s) |
 |---|---|---|---|---|
 | 00 | `init` | Set up project directories, bootstrap `config/pipeline.config`, install R deps | `routes/00_setup_dirs.sh`, `routes/00_install.sh` | -- |
 | 01 | `seurat_preprocess` | Per-sample: create Seurat objects, QC metrics, MACS peak calling, QC plots | `routes/01_seurat_preprocess.sh` | `scripts/seurat_signac_pipeline.R` |
-| 02a | `run_merged_pipeline` | Filter samples per `configs/qc_df.csv`, merge into one object with a consensus peak set | `routes/02a_merge_pipeline.sh` | `scripts/seurat_signac_pipeline.R` |
-| 02b | `filter_and_cluster` | Subcluster within cell lineages (Harmony batch correction) | `routes/02b_filter_and_subcluster.sh` | `scripts/seurat_signac_pipeline.R` |
-| 03 | `identify_celltypes` | UCDeconvolve-assisted cell type calling | `routes/03_identify_celltypes.sh` | `scripts/03_convert_seurat_to_h5ad.R`, `scripts/03_ucd_deconvolve.py`, `scripts/03_plot_ucd_results.R` |
+| 02 | `run_merged_pipeline` | Filter samples per `configs/qc_df.csv`, merge into one object with a consensus peak set + clustering | `routes/02_merge_pipeline.sh` | `scripts/seurat_signac_pipeline.R` |
+| 03 | `identify_celltypes` | UCDeconvolve-assisted cell type calling (human then fills in `configs/cluster_labels.csv`) | `routes/03_identify_celltypes.sh` | `scripts/03_convert_seurat_to_h5ad.R`, `scripts/03_ucd_deconvolve.py`, `scripts/03_plot_ucd_results.R` |
 | 04 | `label_celltypes` | Apply your cluster -> cell-type labels (`configs/cluster_labels.csv`) | `routes/04_label_celltypes.sh` | `scripts/04_label_celltypes.R` |
-| 05 | `call_peaks_grouped` | Re-call ATAC peaks grouped by cell type | `routes/05_call_peaks_grouped.sh` | `scripts/seurat_signac_pipeline.R` |
-| 06 | `linkpeaks` | Link ATAC peaks to nearby genes, in parallel (one job per group + a dependent merge job) | `routes/06_linkpeaks.sh` | `scripts/06a_linkpeaks_split.R`, `scripts/06b_linkpeaks_group.R`, `scripts/06c_linkpeaks_merge.R` |
-| 07 (optional) | `run_scenicplus` | SCENIC+ regulon inference | `routes/optional/07_run_scenicplus.sh` | `scripts/optional/07a_export_scenicplus_data.R`, `07b_reformat_anndata.py`, `07c_scenicplus_pipeline.py` |
+| 05 | `call_peaks_grouped` | Re-call ATAC peaks grouped by cell type -- **branch point** | `routes/05_call_peaks_grouped.sh` | `scripts/seurat_signac_pipeline.R` |
+
+### Downstream branches (independent of each other, run any/all after stage 05)
+
+| `run/runmultiome` stage | What it does | Route | Key script(s) |
+|---|---|---|---|
+| `filter_and_cluster` | Subcluster within cell lineages (Harmony batch correction) | `routes/downstream/subcluster.sh` | `scripts/seurat_signac_pipeline.R` |
+| `linkpeaks` | Link ATAC peaks to nearby genes, in parallel (one job per group + a dependent merge job) | `routes/downstream/linkpeaks.sh` | `scripts/downstream/linkpeaks_split.R`, `linkpeaks_group.R`, `linkpeaks_merge.R` |
+| `run_scenicplus` (optional, extra environments required) | SCENIC+ regulon inference | `routes/optional/run_scenicplus.sh` | `scripts/optional/export_scenicplus_data.R`, `reformat_anndata.py`, `scenicplus_pipeline.py` |
 
 Output RDS checkpoints follow `{project_prefix}-{step}-{name}-obj[-list].RDS`
-in `output/RDS-files/`, so the filename tells you which stage produced it.
+in `output/RDS-files/` for trunk stages (self-documenting which stage
+produced them); downstream branch outputs drop the step number since
+they're not part of a fixed sequence.
 
 ### Why per-sample objects, merged later?
 
 Samples are created, QC'd, and peak-called **individually** before being
-merged (stages 01 -> 02a/02b), rather than pooling raw counts up front. This
+merged (stages 01 -> 02), rather than pooling raw counts up front. This
 is standard Seurat/Signac practice, not an oversight: ambient RNA and
 doublet rates vary per 10x run, so QC thresholds need to be set per sample;
 MACS peak calling on pooled fragments biases toward high-depth samples; and
@@ -56,11 +66,13 @@ Don't "fix" this into an early merge.
 
 ```
 run/runmultiome              # single CLI entry point (dispatcher)
-routes/                      # one shell script per stage, numbered 00-06
-routes/optional/             # SCENIC+ branch (stage 07)
-scripts/                     # R/Python analysis code, numbered to match routes where 1:1
+routes/                      # trunk stages, numbered 00-05 (strict order)
+routes/downstream/           # downstream branches: subcluster.sh, linkpeaks.sh (independent, run any/all after 05)
+routes/optional/             # SCENIC+ branch (extra environments required)
+scripts/                     # R/Python analysis code
 scripts/stages/              # one file per Seurat/Signac pipeline stage (init, create, qc, ...),
                               # sourced by scripts/seurat_signac_pipeline.R based on the stage(s) requested
+scripts/downstream/          # linkpeaks split/group/merge helpers (parallel divide-and-conquer)
 scripts/optional/            # SCENIC+-specific scripts and config template
 scripts/lib/                 # shared R helpers (config.R, genome.R)
 config/                      # pipeline MACHINERY config (HPC paths, env names) -- edit once
@@ -97,22 +109,6 @@ does this for you automatically if the file doesn't exist yet.
 `run/runmultiome` auto-detects SLURM vs LSF (via `$SLURM_JOB_ID` /
 `$LSF_ENVDIR`) and submits jobs accordingly; partition/project/queue come
 from `config/pipeline.config`.
-
-## Known limitations
-
-These are pre-existing gaps in the pipeline's stage-to-stage file handoffs
-that this reformatting pass did not change (see git history for the full
-rationale) -- worth knowing about if a stage can't find its expected input:
-
-- `routes/05_call_peaks_grouped.sh` expects an input RDS
-  (`-improved-clustering-annotated-filtered.RDS`) that no current route
-  actually produces under that name.
-- `routes/04_label_celltypes.sh` expects `{prefix}-merged-obj-list.RDS`,
-  but stage 02a currently produces `{prefix}-02a-merge-obj-list.RDS`.
-
-If you hit either of these, check `output/RDS-files/` for the actual
-filename produced by the previous stage and adjust the route's `-R` flag
-(or the input file name) accordingly.
 
 ## Version
 
