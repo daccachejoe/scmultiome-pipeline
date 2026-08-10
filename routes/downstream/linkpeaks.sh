@@ -20,7 +20,9 @@ fi
 
 GROUPING_VAR=ct
 OUT_PREFIX="${project_prefix}-improved-clust-filtered-full-"
-INPUT_RDS="output/RDS-files/${project_prefix}-grouped-peaks-05-callpeaks-obj-list.RDS"
+# override to point this stage at a different input, e.g.:
+# INPUT_RDS=output/RDS-files/my-variant-05-callpeaks-obj-list.RDS run/runmultiome linkpeaks
+INPUT_RDS="${INPUT_RDS:-output/RDS-files/${project_prefix}-grouped-peaks-05-callpeaks-obj-list.RDS}"
 
 echo "Splitting object by ${GROUPING_VAR} for parallel linkpeaks"
 scripts/downstream/linkpeaks_split.R "$INPUT_RDS" "$GROUPING_VAR" "$OUT_PREFIX"

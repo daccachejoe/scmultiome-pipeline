@@ -18,12 +18,9 @@ library(reticulate)
 use_condaenv(args[[3]])
 library(Seurat)
 library(Signac)
+source("scripts/lib/seurat_io.R")
 
-obj <- readRDS(args[[1]])
-obj
-if(typeof(obj) == "list"){
-  obj <- obj[[1]]
-}
+obj <- first_seurat(readRDS(args[[1]]))
 
 DefaultAssay(obj) <- "RNA"
 obj <- DietSeurat(obj, assays = "RNA", dimreducs = c("pca","wnn.umap"))

@@ -3,16 +3,12 @@ future::plan("multicore", workers = as.numeric(future::availableCores()))
 library(Signac)
 library(Seurat)
 library(readr)
+source("scripts/lib/seurat_io.R")
 
-cli <- commandArgs(trailingOnly = TRUE) 
+cli <- commandArgs(trailingOnly = TRUE)
 infile = cli[[1]]
 
-obj <- readRDS(infile)
-
-# If type of object is not a list, make it into a list then run all functions as if it were a list
-if (is.list(obj)) {
-    obj <- obj[[1]]
-}
+obj <- first_seurat(readRDS(infile))
 
 # # Exporting the data for SCENICplus
 mat <- obj[["peaks"]]@counts

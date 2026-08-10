@@ -7,6 +7,7 @@
 
 suppressMessages(library(Seurat))
 suppressMessages(library(Signac))
+source("scripts/lib/seurat_io.R")
 
 args <- commandArgs(trailingOnly = TRUE)
 input.rds <- args[[1]]
@@ -14,10 +15,7 @@ grouping.var <- args[[2]]
 out.prefix <- args[[3]]
 
 obj.list <- readRDS(input.rds)
-if (!is(obj.list, "list")) {
-  obj.list <- list(obj.list)
-}
-obj <- obj.list[[1]]
+obj <- first_seurat(obj.list)
 
 Idents(obj) <- obj[[grouping.var]][, 1]
 groups.obj.list <- SplitObject(obj, split.by = grouping.var)

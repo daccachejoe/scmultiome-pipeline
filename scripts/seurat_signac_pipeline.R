@@ -58,6 +58,7 @@ library(ggplot2, quietly=TRUE)
 # library(enrichR, quietly=TRUE)
 
 source("scripts/lib/genome.R")
+source("scripts/lib/seurat_io.R")
 species.info <- load_species_genome()
 ensdb.to.use <- species.info$ensdb
 genome.to.use <- species.info$genome
@@ -82,9 +83,7 @@ peak.genome <- genome.to.use
 if(!(argv$RDS.file.in == "NA")){
     message("Loading in: ", argv$RDS.file.in)
     obj.list <- readRDS(argv$RDS.file.in)
-    if(class(obj.list) != "list"){
-        obj.list <- list(obj.list)
-    }
+    obj.list <- as_seurat_list(obj.list)
 }
 
 # Stages run in this fixed order regardless of the order they're listed in

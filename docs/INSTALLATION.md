@@ -9,7 +9,7 @@ and sceasy pin conflicting dependency versions.
 | `conda_env_name`                      | Main Seurat/Signac R analysis (trunk stages 00-05, downstream subcluster/linkpeaks) |
 | `sceasy_env_name`                      | Converts Seurat objects to AnnData (`.h5ad`) |
 | `UCD_env_name`                         | UCDeconvolve cell-type calling (stage 03)  |
-| `scenicplus_env_name`                  | SCENIC+ regulon inference (downstream, optional) |
+| `scenicplus_env_name`                  | SCENIC+ regulon inference (downstream branch, extra environments) |
 
 Before starting, copy the config template and fill in your environment names
 and paths (see `config/pipeline.config.example` for every key):
@@ -115,7 +115,7 @@ Then install `create_cisTarget_databases` per the
 [SCENIC+ docs](https://scenicplus.readthedocs.io/en/latest/install.html)
 (everything is usually already installed except `python-flatbuffers`:
 `conda install python-flatbuffers`), plus Cluster-Buster and the motif
-collection referenced in `routes/optional/07_run_scenicplus.sh`.
+collection referenced in `routes/downstream/run_scenicplus.sh`.
 
 Set `create_cistarget_databases_path` and `create_cistarget_databases_dir`
 in `config/pipeline.config` to point at your install.

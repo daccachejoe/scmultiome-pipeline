@@ -6,6 +6,8 @@
 #
 # Usage: scripts/downstream/linkpeaks_merge.R <out_prefix> <comma_separated_group_names>
 
+source("scripts/lib/seurat_io.R")
+
 args <- commandArgs(trailingOnly = TRUE)
 out.prefix <- args[[1]]
 groups <- strsplit(args[[2]], ",")[[1]]
@@ -16,7 +18,7 @@ linked.list <- lapply(groups, function(group.name) {
   if (!file.exists(in.file)) {
     stop("Missing expected group output: ", in.file, " (did the group job for '", group.name, "' fail?)")
   }
-  readRDS(in.file)
+  first_seurat(readRDS(in.file))
 })
 names(linked.list) <- groups
 

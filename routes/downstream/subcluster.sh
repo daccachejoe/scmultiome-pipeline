@@ -13,21 +13,18 @@ else
 fi
 
 if [[ $(wc -l < "configs/qc_df.csv") -gt 0 ]]; then
-    # scripts/seurat_signac_pipeline.R \
-    #     filter,cluster \
-    #     configs/samplesheet.csv \
-    #     --project_prefix $project_prefix \
-    #     -m $my_macs_path \
-    #     -R output/RDS-files/$project_prefix-qc-obj-list-improved.RDS \
-    #     --qc.sheet configs/qc_df.csv
+    # override to point this stage at a different input, e.g.:
+    # INPUT_RDS=output/RDS-files/my-variant-05-callpeaks-obj-list.RDS run/runmultiome filter_and_cluster
+    INPUT_RDS="${INPUT_RDS:-output/RDS-files/$project_prefix-grouped-peaks-05-callpeaks-obj-list.RDS}"
+
     scripts/seurat_signac_pipeline.R \
         subcluster \
         configs/samplesheet.csv \
         --project_prefix $project_prefix-lineage-improved \
         -m $my_macs_path \
         --RunHarmony \
-        -R output/RDS-files/$project_prefix-grouped-peaks-05-callpeaks-obj-list.RDS \
-        --qc.sheet configs/qc_df.csv    
+        -R "$INPUT_RDS" \
+        --qc.sheet configs/qc_df.csv
 else
     echo "qc_df.csv does not have more than one line. Please fill it out and try again."
 fi

@@ -12,6 +12,7 @@ suppressMessages(library(dplyr))
 source("scripts/lib/config.R")
 load_pipeline_config()
 source("scripts/lib/genome.R")
+source("scripts/lib/seurat_io.R")
 species.info <- load_species_genome()
 peak.genome <- species.info$genome
 
@@ -22,7 +23,7 @@ input.rds <- args[[1]]
 group.name <- args[[2]]
 out.prefix <- args[[3]]
 
-obj <- readRDS(input.rds)
+obj <- first_seurat(readRDS(input.rds))
 obj <- LinkPeaksToGenes(obj,
                          genes = NULL,
                          distance.to.use = 250001,

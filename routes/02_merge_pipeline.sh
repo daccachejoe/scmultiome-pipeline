@@ -8,6 +8,10 @@ else
     echo "No job scheduler available to submit job: $script"
 fi
 
+# override to point this stage at a different input, e.g.:
+# INPUT_RDS=output/RDS-files/my-variant-01-qc-obj-list.RDS run/runmultiome run_merged_pipeline
+INPUT_RDS="${INPUT_RDS:-output/RDS-files/$project_prefix-01-qc-obj-list.RDS}"
+
 echo Running merged pipeline
 scripts/seurat_signac_pipeline.R \
         filter,merge \
@@ -16,4 +20,4 @@ scripts/seurat_signac_pipeline.R \
         --project_prefix $project_prefix \
         -m $my_macs_path \
         --RunHarmony \
-        -R output/RDS-files/$project_prefix-01-qc-obj-list.RDS
+        -R "$INPUT_RDS"

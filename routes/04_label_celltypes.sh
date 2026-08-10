@@ -12,10 +12,14 @@ if [[ $(wc -l < "configs/cluster_labels.csv") -gt 1 ]]; then
     echo Using annotating cell types with cluster_labels.csv
     resolution=$(cat configs/resolution_to_use.txt)
 
+    # override to point this stage at a different input, e.g.:
+    # INPUT_RDS=output/RDS-files/my-variant-02-merge-obj-list.RDS run/runmultiome label_celltypes
+    INPUT_RDS="${INPUT_RDS:-output/RDS-files/$project_prefix-02-merge-obj-list.RDS}"
+
     Rscript scripts/04_label_celltypes.R \
         configs/cluster_labels.csv \
         $resolution \
-        output/RDS-files/$project_prefix-02-merge-obj-list.RDS \
+        "$INPUT_RDS" \
         $project_prefix
     echo Celltype labelling is complete. Exiting. 
 else

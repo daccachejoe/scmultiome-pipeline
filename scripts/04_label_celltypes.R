@@ -3,15 +3,16 @@ library(Seurat)
 library(dplyr)
 library(ggplot2)
 library(Signac)
+source("scripts/lib/seurat_io.R")
 
-cli <- commandArgs(trailingOnly = TRUE) 
+cli <- commandArgs(trailingOnly = TRUE)
 annotations = cli[[1]]
 resolution = cli[[2]]
 object = cli[[3]]
 project_prefix = cli[[4]]
 
 obj <- readRDS(object)
-obj <- obj[[1]]
+obj <- first_seurat(obj)
 
 ct.df <- read.csv(annotations)
 obj$ct <- ct.df$ct[match(obj@meta.data[[resolution]], ct.df$cluster)]

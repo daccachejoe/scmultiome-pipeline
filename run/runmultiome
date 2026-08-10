@@ -109,7 +109,7 @@ linkpeaks() {
 
 run_scenicplus() {
     echo "Downstream branch (optional, extra environments required): running SCENIC+"
-    submit_job routes/optional/run_scenicplus.sh scripts/outs/scenicplus-%J.out 12:00 40000 32
+    submit_job routes/downstream/run_scenicplus.sh scripts/outs/scenicplus-%J.out 12:00 40000 32
 }
 
 run_multiome() {

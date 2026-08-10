@@ -45,7 +45,7 @@ corresponding `routes/*.sh` script.
 |---|---|---|---|
 | `filter_and_cluster` | Subcluster within cell lineages (Harmony batch correction) | `routes/downstream/subcluster.sh` | `scripts/seurat_signac_pipeline.R` |
 | `linkpeaks` | Link ATAC peaks to nearby genes, in parallel (one job per group + a dependent merge job) | `routes/downstream/linkpeaks.sh` | `scripts/downstream/linkpeaks_split.R`, `linkpeaks_group.R`, `linkpeaks_merge.R` |
-| `run_scenicplus` (optional, extra environments required) | SCENIC+ regulon inference | `routes/optional/run_scenicplus.sh` | `scripts/optional/export_scenicplus_data.R`, `reformat_anndata.py`, `scenicplus_pipeline.py` |
+| `run_scenicplus` (extra environments required) | SCENIC+ regulon inference | `routes/downstream/run_scenicplus.sh` | `scripts/downstream/export_scenicplus_data.R`, `reformat_anndata.py`, `scenicplus_pipeline.py` |
 
 Output RDS checkpoints follow `{project_prefix}-{step}-{name}-obj[-list].RDS`
 in `output/RDS-files/` for trunk stages (self-documenting which stage
@@ -76,20 +76,18 @@ Don't "fix" this into an early merge.
 │   ├── 03_identify_celltypes.sh
 │   ├── 04_label_celltypes.sh
 │   ├── 05_call_peaks_grouped.sh   # branch point: cell types called, peaks re-called
-│   ├── downstream/                # independent branches, run any/all after 05
-│   │   ├── subcluster.sh
-│   │   └── linkpeaks.sh
-│   └── optional/                  # extra environments required
-│       └── run_scenicplus.sh
+│   └── downstream/                # independent branches, run any/all after 05
+│       ├── subcluster.sh
+│       ├── linkpeaks.sh
+│       └── run_scenicplus.sh      # extra environments required
 ├── scripts/                       # R/Python analysis code
 │   ├── seurat_signac_pipeline.R   # engine: arg parsing + config/species setup + dispatch
 │   ├── functions.R                # shared Seurat/Signac wrapper functions
 │   ├── 03_convert_seurat_to_h5ad.R, 03_ucd_deconvolve.py, 03_plot_ucd_results.R
 │   ├── 04_label_celltypes.R
 │   ├── stages/                    # one file per pipeline stage, sourced by the engine
-│   ├── downstream/                # linkpeaks split/group/merge helpers
-│   ├── optional/                  # SCENIC+-specific scripts + config template
-│   └── lib/                       # shared R helpers (config.R, genome.R)
+│   ├── downstream/                # subcluster/linkpeaks helpers + SCENIC+ scripts
+│   └── lib/                       # shared R helpers (config.R, genome.R, seurat_io.R)
 ├── config/                        # pipeline MACHINERY config -- edit once
 │   ├── pipeline.config.example    # tracked template
 │   └── pipeline.config            # your values (git-ignored)
