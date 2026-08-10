@@ -47,7 +47,7 @@ step in multiome analysis, not something most users would skip.
 
 | `run/runmultiome` stage | What it does | Route | Key script(s) |
 |---|---|---|---|
-| `filter_and_cluster` | Subcluster within cell lineages (Harmony batch correction) | `routes/downstream/subcluster.sh` | `scripts/seurat_signac_pipeline.R` |
+| `subcluster` | Subcluster within cell lineages (Harmony batch correction) | `routes/downstream/subcluster.sh` | `scripts/seurat_signac_pipeline.R` |
 | `run_scenicplus` (extra environments required) | SCENIC+ regulon inference | `routes/downstream/run_scenicplus.sh` | `scripts/downstream/export_scenicplus_data.R`, `reformat_anndata.py`, `scenicplus_pipeline.py` |
 
 These are exploratory or heavyweight extras (a closer look at a specific

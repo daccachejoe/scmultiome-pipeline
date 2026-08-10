@@ -20,7 +20,7 @@ Trunk stages (run in this strict order):
 Downstream branches (optional, independent of each other, run any/all
 after stage 05 -- peak-gene linking above is standard; these are
 exploratory/heavyweight extras):
-  filter_and_cluster     subcluster within cell lineages
+  subcluster             subcluster within cell lineages
   run_scenicplus         (extra environments required) SCENIC+ regulon inference
 
 Run per-sample stages, then review outputs in output/, before moving to
@@ -121,7 +121,7 @@ linkpeaks() {
 # Downstream branches (optional) -- read stage 05's output independently;
 # run any or all of them in any order once call_peaks_grouped has completed.
 
-filter_and_cluster() {
+subcluster() {
     echo "Downstream branch: subclustering within cell lineages"
     submit_job routes/downstream/subcluster.sh scripts/outs/subcluster-%J.out 36:00 32000 24
 }

@@ -14,7 +14,7 @@ fi
 
 if [[ $(wc -l < "configs/qc_df.csv") -gt 0 ]]; then
     # override to point this stage at a different input, e.g.:
-    # INPUT_RDS=output/RDS-files/my-variant-05-callpeaks-obj-list.RDS run/runmultiome filter_and_cluster
+    # INPUT_RDS=output/RDS-files/my-variant-05-callpeaks-obj-list.RDS run/runmultiome subcluster
     INPUT_RDS="${INPUT_RDS:-output/RDS-files/$project_prefix-grouped-peaks-05-callpeaks-obj-list.RDS}"
 
     scripts/seurat_signac_pipeline.R \
