@@ -18,7 +18,7 @@ Trunk stages (run in this strict order):
                               (branch point: cell types called, peaks re-called)
 
 Downstream branches (independent of each other, run any/all after stage 05):
-  filter_and_cluster    subcluster within cell lineages
+  filter_and_cluster     subcluster within cell lineages
   linkpeaks              link ATAC peaks to nearby genes
   run_scenicplus         (optional, extra environments required) SCENIC+ regulon inference
 
