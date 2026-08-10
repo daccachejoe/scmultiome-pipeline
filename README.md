@@ -59,6 +59,8 @@ run/runmultiome              # single CLI entry point (dispatcher)
 routes/                      # one shell script per stage, numbered 00-06
 routes/optional/             # SCENIC+ branch (stage 07)
 scripts/                     # R/Python analysis code, numbered to match routes where 1:1
+scripts/stages/              # one file per Seurat/Signac pipeline stage (init, create, qc, ...),
+                              # sourced by scripts/seurat_signac_pipeline.R based on the stage(s) requested
 scripts/optional/            # SCENIC+-specific scripts and config template
 scripts/lib/                 # shared R helpers (config.R, genome.R)
 config/                      # pipeline MACHINERY config (HPC paths, env names) -- edit once
