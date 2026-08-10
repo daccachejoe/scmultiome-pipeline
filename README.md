@@ -65,20 +65,44 @@ Don't "fix" this into an early merge.
 ## Repository structure
 
 ```
-run/runmultiome              # single CLI entry point (dispatcher)
-routes/                      # trunk stages, numbered 00-05 (strict order)
-routes/downstream/           # downstream branches: subcluster.sh, linkpeaks.sh (independent, run any/all after 05)
-routes/optional/             # SCENIC+ branch (extra environments required)
-scripts/                     # R/Python analysis code
-scripts/stages/              # one file per Seurat/Signac pipeline stage (init, create, qc, ...),
-                              # sourced by scripts/seurat_signac_pipeline.R based on the stage(s) requested
-scripts/downstream/          # linkpeaks split/group/merge helpers (parallel divide-and-conquer)
-scripts/optional/            # SCENIC+-specific scripts and config template
-scripts/lib/                 # shared R helpers (config.R, genome.R)
-config/                      # pipeline MACHINERY config (HPC paths, env names) -- edit once
-configs/                     # per-project RUN INPUTS (samplesheet, QC thresholds) -- edit per project
-data/, output/                # per-project data and results (not tracked in git)
-docs/INSTALLATION.md         # environment setup
+.
+├── run/
+│   └── runmultiome                # single CLI entry point (dispatcher)
+├── routes/                        # trunk stages, numbered 00-05 (strict order)
+│   ├── 00_setup_dirs.sh
+│   ├── 00_install.sh
+│   ├── 01_seurat_preprocess.sh
+│   ├── 02_merge_pipeline.sh
+│   ├── 03_identify_celltypes.sh
+│   ├── 04_label_celltypes.sh
+│   ├── 05_call_peaks_grouped.sh   # branch point: cell types called, peaks re-called
+│   ├── downstream/                # independent branches, run any/all after 05
+│   │   ├── subcluster.sh
+│   │   └── linkpeaks.sh
+│   └── optional/                  # extra environments required
+│       └── run_scenicplus.sh
+├── scripts/                       # R/Python analysis code
+│   ├── seurat_signac_pipeline.R   # engine: arg parsing + config/species setup + dispatch
+│   ├── functions.R                # shared Seurat/Signac wrapper functions
+│   ├── 03_convert_seurat_to_h5ad.R, 03_ucd_deconvolve.py, 03_plot_ucd_results.R
+│   ├── 04_label_celltypes.R
+│   ├── stages/                    # one file per pipeline stage, sourced by the engine
+│   ├── downstream/                # linkpeaks split/group/merge helpers
+│   ├── optional/                  # SCENIC+-specific scripts + config template
+│   └── lib/                       # shared R helpers (config.R, genome.R)
+├── config/                        # pipeline MACHINERY config -- edit once
+│   ├── pipeline.config.example    # tracked template
+│   └── pipeline.config            # your values (git-ignored)
+├── configs/                       # per-project RUN INPUTS -- edit per project
+│   ├── samplesheet.csv
+│   ├── qc_df.csv
+│   ├── cluster_labels.csv
+│   ├── resolution_to_use.txt
+│   └── scenicplus-*-config.yml
+├── data/                          # per-project raw data (not tracked in git)
+├── output/                        # per-project results (not tracked in git)
+└── docs/
+    └── INSTALLATION.md            # environment setup
 ```
 
 `config/` (no trailing 's') vs `configs/` (trailing 's') is a deliberately
