@@ -24,6 +24,13 @@ Downstream branches (independent of each other, run any/all after stage 05):
 
 Run per-sample stages, then review outputs in output/, before moving to
 the next stage. See README.md for the full walkthrough.
+
+Each stage submits its job with its own default time/mem/cores. Override
+any of them for a single run with TIME/MEM/CORES env vars, e.g.:
+  CORES=64 MEM=64000 run/runmultiome seurat_preprocess
+Most trunk/downstream stages also accept an INPUT_RDS override to point
+at a different input object -- see the comment near the top of each
+routes/*.sh file for its exact default.
 EOF
 }
 
@@ -44,9 +51,12 @@ detect_scheduler() {
 submit_job() {
     local script=$1
     local output=$2
-    local time=$3
-    local mem=$4
-    local cores=$5
+    # each stage passes its own sensible default time/mem/cores; set
+    # TIME/MEM/CORES before invoking run/runmultiome to override them for
+    # that one run, e.g.: CORES=64 MEM=64000 run/runmultiome seurat_preprocess
+    local time=${TIME:-$3}
+    local mem=${MEM:-$4}
+    local cores=${CORES:-$5}
 
     if [ "$SCHEDULER" == "slurm" ]; then
         time=0-$time:00

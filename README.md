@@ -132,6 +132,17 @@ does this for you automatically if the file doesn't exist yet.
 `$LSF_ENVDIR`) and submits jobs accordingly; partition/project/queue come
 from `config/pipeline.config`.
 
+Each stage submits its job with its own default time/mem/cores. Override
+any of them for a single run with `TIME`/`MEM`/`CORES` env vars:
+
+```
+CORES=64 MEM=64000 run/runmultiome seurat_preprocess
+```
+
+Most trunk/downstream stages also accept an `INPUT_RDS` override to point
+at a different input object -- see the comment near the top of each
+`routes/*.sh` file for its exact default.
+
 ## Version
 
 See [VERSION](VERSION). This is the first structurally reformatted release
