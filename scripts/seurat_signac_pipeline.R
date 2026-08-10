@@ -196,6 +196,10 @@ if("qc" %in% pipelines.to.run){
                      "2" = c("nFeature_RNA","nFeature_peaks"),
                      "3" = "percent.mt",
                      "4" = c("nucleosome_signal" ,"TSS.enrichment"))
+    # custom ggplot2 (not VlnPlot): compares metadata across obj.list, which
+    # is still a list of separate per-sample objects at this point (samples
+    # aren't merged until the "merge" stage), and VlnPlot requires a single
+    # object. p.list.2 below uses VlnPlot per-object once that's possible.
     p.list <-
         lapply(list.of.vars, function(vars.to.plot){
             p <- 

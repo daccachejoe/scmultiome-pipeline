@@ -6,6 +6,7 @@ if (nzchar(Sys.getenv("r_libs_personal_path"))) {
 
 library(dplyr)
 library(ggplot2)
+library(SeuratObject) # for NoLegend()
 library(argparser, quietly=TRUE)
 
 cli <- commandArgs(trailingOnly = TRUE) 
