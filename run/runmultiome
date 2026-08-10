@@ -25,9 +25,17 @@ Downstream branches (independent of each other, run any/all after stage 05):
 Run per-sample stages, then review outputs in output/, before moving to
 the next stage. See README.md for the full walkthrough.
 
+Examples:
+  # normal run, using this stage's default time/mem/cores and input
+  run/runmultiome seurat_preprocess
+
+  # same stage, with more cores/memory and a different input object for
+  # just this one run (TIME/MEM/CORES/INPUT_RDS all revert to defaults
+  # next time you don't set them)
+  CORES=64 MEM=64000 INPUT_RDS=output/RDS-files/my-variant-obj-list.RDS run/runmultiome call_peaks_grouped
+
 Each stage submits its job with its own default time/mem/cores. Override
-any of them for a single run with TIME/MEM/CORES env vars, e.g.:
-  CORES=64 MEM=64000 run/runmultiome seurat_preprocess
+any of them for a single run with TIME/MEM/CORES env vars.
 Most trunk/downstream stages also accept an INPUT_RDS override to point
 at a different input object -- see the comment near the top of each
 routes/*.sh file for its exact default.
