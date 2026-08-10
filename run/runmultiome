@@ -67,11 +67,14 @@ submit_job() {
     local mem=${MEM:-$4}
     local cores=${CORES:-$5}
 
+    # invoke via `bash $script` rather than executing $script directly --
+    # doesn't depend on the file's executable bit being set (git can lose
+    # that on checkout) or its shebang being honored by the scheduler.
     if [ "$SCHEDULER" == "slurm" ]; then
         time=0-$time:00
-        sbatch -c $cores -p "$slurm_partition" --mem-per-cpu $mem -o $output -t $time --export=ALL $script
+        sbatch -c $cores -p "$slurm_partition" --mem-per-cpu $mem -o $output -t $time --export=ALL --wrap="bash $script"
     elif [ "$SCHEDULER" == "lsf" ]; then
-        bsub -P "$lsf_project" -q "$lsf_queue" -n $cores -R "rusage[mem=$mem]" -R span[hosts=1] -o $output -W $time $script
+        bsub -P "$lsf_project" -q "$lsf_queue" -n $cores -R "rusage[mem=$mem]" -R span[hosts=1] -o $output -W $time "bash $script"
     else
         echo "No job scheduler available to submit job: $script"
     fi
