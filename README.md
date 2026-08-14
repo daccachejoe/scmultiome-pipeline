@@ -49,10 +49,13 @@ step in multiome analysis, not something most users would skip.
 |---|---|---|---|
 | `subcluster` | Subcluster within cell lineages (Harmony batch correction) | `routes/downstream/subcluster.sh` | `scripts/seurat_signac_pipeline.R` |
 | `run_scenicplus` (extra environments required) | SCENIC+ regulon inference | `routes/downstream/run_scenicplus.sh` | `scripts/downstream/export_scenicplus_data.R`, `reformat_anndata.py`, `scenicplus_pipeline.py` |
+| `decoder` (extra environment required) | Constrained multinomial logistic regression decoder: pseudobulk -> distal-peak LSI / RNA PCA -> CV-fit decoder -> peak-space projection -> stable-peak identification -> motif enrichment | `routes/downstream/decoder.sh` | `scripts/downstream/decoder/*` |
+| `decoder_self_test` | Synthetic end-to-end check of the decoder branch (no real/demultiplexed data needed) | `routes/downstream/decoder_self_test.sh` | `scripts/downstream/decoder/self_test_e2e.py` |
 
 These are exploratory or heavyweight extras (a closer look at a specific
-lineage, or a separate regulon-inference toolchain), unlike linkpeaks --
-so they stay outside the trunk and don't run unless you ask for them.
+lineage, a separate regulon-inference toolchain, or a separate
+condition-decoding model), unlike linkpeaks -- so they stay outside the
+trunk and don't run unless you ask for them.
 
 Output RDS checkpoints follow `{project_prefix}-{step}-{name}-obj[-list].RDS`
 in `output/RDS-files/` for trunk stages, including linkpeaks (06)
@@ -68,6 +71,87 @@ doublet rates vary per 10x run, so QC thresholds need to be set per sample;
 MACS peak calling on pooled fragments biases toward high-depth samples; and
 Harmony batch correction needs per-sample structure to correct against.
 Don't "fix" this into an early merge.
+
+### Decoder methodology & caveats
+
+The `decoder` branch trains condition-specific classifiers whose weight
+vectors are constrained to be linear combinations of a small set of
+biologically interpretable "component" directions (e.g. subclinical
+effect, disease identity, shared lesional effect, disease-specific
+interaction), via an externally-supplied constraint matrix
+(`configs/decoder/constraint_matrix.csv`) -- never hardcoded, so a new
+condition set or a longitudinal extension is a matrix swap, not a code
+change. A few design decisions worth knowing before trusting its output:
+
+- **Preprocessing is fit per CV fold, not once globally.** Standardizing
+  and cell-type-centering features before splitting into CV folds would
+  leak held-out-fold statistics into training, biasing the L2
+  regularization-strength grid search optimistic.
+  `scripts/downstream/decoder/03_train_cv.py` fits
+  `preprocessing.fit_standardize_then_center()` fresh on each training
+  split (grid search and per-fold refit) and only applies those
+  statistics to that split's held-out fold. The one exception is the
+  final all-data model (Phase C), which has no held-out set and so no
+  leakage concern.
+- **CV folds are leave-one-donor-out by default, not leave-one-condition-
+  out**, even though this dataset's conditions are sometimes described as
+  "experiments." This constraint matrix has components that are nonzero
+  for exactly one condition (e.g. the PSO x Lesional interaction term) --
+  leaving that condition out of a fold would delete 100% of that
+  component's training signal, not run a real held-out test. Donor-level
+  folds keep every condition (and therefore every component) represented
+  in every training split. Configurable via `decoder_fold_col` /
+  `--fold_col` if the donor pool grows enough to revisit this.
+- **The stable-peak t-test's p-values are optimistic.** Leave-one-donor-
+  out folds share most of their training data, so per-fold peak weights
+  are correlated, not independent draws -- inherent to this kind of
+  CV-based stability selection, not a bug. `05_identify_stable_peaks.py`
+  reports `n_folds_positive`/`frac_folds_positive` alongside the BH-
+  corrected q-values as a non-parametric cross-check; don't rely on the
+  q-value alone near the `--fdr_threshold` boundary.
+- **`beta_sub` (the "vs. healthy control" effect) is provisional until HC
+  donors are demultiplexed.** The model still fits with zero reference
+  samples -- the reference intercept is fixed at 0 by construction -- but
+  the effect is then estimated purely by extrapolation from the other
+  conditions, never anchored against an observed healthy baseline.
+  `decoder_config.json` records a `reference_caveat` field whenever this
+  applies.
+
+Run `run/runmultiome decoder_self_test` any time to check the whole
+pseudobulk -> feature engineering -> CV -> peak projection -> stability
+chain end-to-end against synthetic data (useful before real
+demultiplexed donors exist, or after changing any step's I/O format).
+
+#### Overriding metadata schema per-run
+
+`decoder_celltype_col`/`decoder_donor_col`/`decoder_condition_col`/
+`decoder_location_col`/`decoder_rna_assay`/`decoder_atac_assay` in
+`config/pipeline.config` set this project's metadata column names once.
+Unlike `TIME`/`MEM`/`CORES`/`INPUT_RDS`, those are config keys, so a
+same-named env var set before `run/runmultiome decoder` gets silently
+overwritten by the config file (`run/runmultiome` sources it
+unconditionally). To point the decoder at a *different* object's schema
+for a single run without editing the shared config, use the
+`DECODER_*`-prefixed variants instead -- these aren't config keys, so
+they survive:
+
+```
+DECODER_CELLTYPE_COL=cell_type DECODER_DONOR_COL=patient_id \
+    run/runmultiome decoder
+```
+
+This is what actually makes the decoder branch portable to a Seurat
+object from a different project/lab with different metadata column
+names, rather than requiring you to edit `config/pipeline.config` (which
+every other stage also reads) every time you point it somewhere new.
+
+Output lands under `output/decoder/<run_tag>/`, where `<run_tag>` encodes
+the actual combination of column/assay/fold_col/constraint-matrix
+parameters used (e.g. `ct-ct.spec_donor-donor_id_..._cmat-constraint_matrix`)
+-- two runs with different overrides write to separate directories instead
+of one overwriting the other's output, so different schemas/constraint
+matrices can be run side by side. Set `DECODER_RUN_TAG=my-label` for a
+shorter, hand-chosen directory name instead of the auto-generated one.
 
 ## Repository structure
 
@@ -86,7 +170,9 @@ Don't "fix" this into an early merge.
 │   ├── 06_linkpeaks.sh
 │   └── downstream/                # optional branches, run any/all after 05
 │       ├── subcluster.sh
-│       └── run_scenicplus.sh      # extra environments required
+│       ├── run_scenicplus.sh      # extra environments required
+│       ├── decoder.sh             # extra environment required
+│       └── decoder_self_test.sh
 ├── scripts/                       # R/Python analysis code
 │   ├── seurat_signac_pipeline.R   # engine: arg parsing + config/species setup + dispatch
 │   ├── functions.R                # shared Seurat/Signac wrapper functions
@@ -94,7 +180,10 @@ Don't "fix" this into an early merge.
 │   ├── 04_label_celltypes.R
 │   ├── 06a_linkpeaks_split.R, 06b_linkpeaks_group.R, 06c_linkpeaks_merge.R
 │   ├── stages/                    # one file per pipeline stage, sourced by the engine
-│   ├── downstream/                # subcluster helper + SCENIC+ scripts
+│   ├── downstream/                # subcluster helper, SCENIC+, and decoder scripts
+│   │   └── decoder/                # pseudobulk -> features -> CV decoder -> peak projection
+│   │                               #   -> stable peaks -> motif enrichment (see README's
+│   │                               #   "Decoder methodology & caveats")
 │   └── lib/                       # shared R helpers (config.R, genome.R, seurat_io.R)
 ├── config/                        # pipeline MACHINERY config -- edit once
 │   ├── pipeline.config.example    # tracked template
@@ -104,7 +193,8 @@ Don't "fix" this into an early merge.
 │   ├── qc_df.csv
 │   ├── cluster_labels.csv
 │   ├── resolution_to_use.txt
-│   └── scenicplus-*-config.yml
+│   ├── scenicplus-*-config.yml
+│   └── decoder/constraint_matrix.csv
 ├── data/                          # per-project raw data (not tracked in git)
 ├── output/                        # per-project results (not tracked in git)
 └── docs/

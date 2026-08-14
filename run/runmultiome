@@ -22,6 +22,9 @@ after stage 05 -- peak-gene linking above is standard; these are
 exploratory/heavyweight extras):
   subcluster             subcluster within cell lineages
   run_scenicplus         (extra environments required) SCENIC+ regulon inference
+  decoder                (extra environment required) constrained decoder: pseudobulk ->
+                          LSI/PCA -> CV-fit decoder -> peak projection -> stability -> motif enrichment
+  decoder_self_test      synthetic end-to-end check of the decoder branch (no real data needed)
 
 Run per-sample stages, then review outputs in output/, before moving to
 the next stage. See README.md for the full walkthrough.
@@ -132,6 +135,16 @@ subcluster() {
 run_scenicplus() {
     echo "Downstream branch (extra environments required): running SCENIC+"
     submit_job routes/downstream/run_scenicplus.sh scripts/outs/scenicplus-%J.out 12:00 40000 32
+}
+
+decoder() {
+    echo "Downstream branch (extra environment required): running constrained decoder"
+    submit_job routes/downstream/decoder.sh scripts/outs/decoder-%J.out 12:00 24000 8
+}
+
+decoder_self_test() {
+    echo "Downstream branch: decoder synthetic end-to-end self-test"
+    submit_job routes/downstream/decoder_self_test.sh scripts/outs/decoder-self-test-%J.out 0:30 4000 2
 }
 
 run_multiome() {

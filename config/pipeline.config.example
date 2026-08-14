@@ -24,6 +24,7 @@ personal_anaconda_path=/path/to/miniconda3/etc/profile.d/conda.sh
 sceasy_env_name=sceasy-env
 UCD_env_name=ucd-env
 scenicplus_env_name=scenicplus-env
+decoder_env_name=decoder-env
 
 # ---- Tool paths ----
 my_macs_path=/path/to/conda/envs/macs-env/bin/macs3
@@ -45,3 +46,20 @@ lsf_queue=premium
 # R module loaded on LSF submission (kept consistent across all routes)
 lsf_r_module=R/4.2.0
 slurm_r_module=r/4.1.2
+
+# ---- Decoder (downstream branch) ----
+# Metadata columns on the object produced by stage 05 (call_peaks_grouped).
+# decoder_celltype_col defaults to stage 04's fine-grained label (ct.spec);
+# override to "ct" for the broad lineage instead.
+decoder_celltype_col=ct.spec
+decoder_donor_col=donor_id
+decoder_condition_col=orig.ident
+decoder_location_col=location
+decoder_rna_assay=RNA
+decoder_atac_assay=peaks
+# CV fold unit for scripts/downstream/decoder/03_train_cv.py -- leave-one-
+# donor-out by default. See "Decoder methodology & caveats" in README.md
+# for why this is the default rather than leave-one-condition-out.
+decoder_fold_col=donor_id
+# HOMER findMotifsGenome.pl on $PATH, or a full path to it
+decoder_homer_script=findMotifsGenome.pl

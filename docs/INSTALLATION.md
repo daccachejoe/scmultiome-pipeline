@@ -1,8 +1,8 @@
 # Installation
 
-This pipeline uses **four separate conda environments** plus your HPC's
+This pipeline uses **five separate conda environments** plus your HPC's
 module system for R. They're kept separate because SCENIC+, UCDeconvolve,
-and sceasy pin conflicting dependency versions.
+sceasy, and PyTorch pin conflicting dependency versions.
 
 | Environment (config key)             | Purpose                                   |
 | ------------------------------------- | ------------------------------------------ |
@@ -10,6 +10,7 @@ and sceasy pin conflicting dependency versions.
 | `sceasy_env_name`                      | Converts Seurat objects to AnnData (`.h5ad`) |
 | `UCD_env_name`                         | UCDeconvolve cell-type calling (stage 03)  |
 | `scenicplus_env_name`                  | SCENIC+ regulon inference (downstream branch, extra environments) |
+| `decoder_env_name`                     | Constrained decoder (downstream branch): PyTorch, scipy, statsmodels |
 
 Before starting, copy the config template and fill in your environment names
 and paths (see `config/pipeline.config.example` for every key):
@@ -119,3 +120,17 @@ collection referenced in `routes/downstream/run_scenicplus.sh`.
 
 Set `create_cistarget_databases_path` and `create_cistarget_databases_dir`
 in `config/pipeline.config` to point at your install.
+
+## 5. Decoder environment (`decoder_env_name`)
+
+```
+conda create -n decoder-env python=3.11
+conda activate decoder-env
+uv pip install -e ".[decoder]"
+uv lock   # produces a real uv.lock for this environment
+```
+
+`scripts/downstream/decoder/06_run_motif_enrichment.py` additionally wraps
+HOMER's `findMotifsGenome.pl` (see `decoder_homer_script` in
+`config/pipeline.config`) -- installed separately, module-loaded or on
+`$PATH`, not part of this conda env.

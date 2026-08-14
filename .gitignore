@@ -12,6 +12,8 @@ output/tables/*
 !output/tables/.gitkeep
 output/ucd/*
 !output/ucd/.gitkeep
+output/decoder/*
+!output/decoder/.gitkeep
 scripts/outs/*
 !scripts/outs/.gitkeep
 

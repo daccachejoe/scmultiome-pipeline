@@ -1,0 +1,6 @@
+condition,beta_sub,beta_dis,beta_loc,beta_int
+HC,0,0,0,0
+AD_NonLesional,1,0,0,0
+PSO_NonLesional,1,1,0,0
+AD_Lesional,1,0,1,0
+PSO_Lesional,1,1,1,1
