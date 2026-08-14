@@ -89,6 +89,23 @@ init() {
         cp config/pipeline.config.example config/pipeline.config
         echo "Created config/pipeline.config from the template."
         echo "Edit it with your HPC/environment values before running further stages."
+    else
+        # catch an existing config up on any keys added to the template
+        # since it was created (e.g. by a newer downstream branch), without
+        # touching values you've already set
+        local added=0
+        while IFS= read -r key; do
+            if ! grep -q "^${key}=" config/pipeline.config; then
+                if [ "$added" -eq 0 ]; then
+                    { echo ""; echo "# ---- Added by init() on $(date +%Y-%m-%d): new keys from a newer pipeline.config.example ----"; } >> config/pipeline.config
+                fi
+                grep "^${key}=" config/pipeline.config.example >> config/pipeline.config
+                added=$((added + 1))
+            fi
+        done < <(grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' config/pipeline.config.example | sed 's/=$//')
+        if [ "$added" -gt 0 ]; then
+            echo "Added $added new key(s) to config/pipeline.config from the template -- review and fill them in."
+        fi
     fi
     # Source it here explicitly rather than relying on the top-level source
     # below: on a fresh run, that check happens *before* this function
