@@ -90,6 +90,13 @@ init() {
         echo "Created config/pipeline.config from the template."
         echo "Edit it with your HPC/environment values before running further stages."
     fi
+    # Source it here explicitly rather than relying on the top-level source
+    # below: on a fresh run, that check happens *before* this function
+    # creates the file, so slurm_r_module/lsf_r_module etc. would otherwise
+    # be unset for the routes/00_*.sh calls just below (e.g. `module load ""`).
+    set -a
+    source config/pipeline.config
+    set +a
     bash routes/00_setup_dirs.sh
     bash routes/00_install.sh
 }
