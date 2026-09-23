@@ -1,57 +1,90 @@
 # Stage: filter
 # Removes cells per configs/qc_df.csv (whole clusters to drop, plus
-# threshold-based filters on arbitrary metadata columns).
+# threshold-based filters on arbitrary metadata columns), then saves the
+# filtered per-sample objects as the stage 02 filter checkpoint.
 # Sourced by scripts/seurat_signac_pipeline.R.
-# Note: this stage does not currently saveRDS its result (pre-existing gap,
-# not something this reformatting pass changed -- see README "Known
-# limitations").
+#
+# qc_df.csv format: one or more rows per sampleName. Within a row,
+# cluster.to.remove / vars.to.filter.by / var.filter / filter.direction may
+# each hold several ";"-separated values; values from all of a sample's rows
+# are pooled. filter.direction says which cells to KEEP:
+#   nFeature_ATAC,500,greater  -> keep cells with nFeature_ATAC > 500
+#   percent.mt,25,less         -> keep cells with percent.mt < 25
+# A cell is kept only if it passes every threshold (and has no NA in the
+# metrics being tested). Samples with no qc_df row are passed through
+# unfiltered, with a message, rather than crashing.
 
 message("Running Filtering Pipeline")
-qc.df <- read.csv(file = argv$qc.sheet)
+qc.df <- read.csv(file = argv$qc.sheet, colClasses = "character", na.strings = c("NA", ""))
+
+# pool a qc_df column across a sample's rows, splitting ";"-joined values and
+# dropping NA/empty entries
+PoolQCField <- function(rows, field) {
+    vals <- unlist(strsplit(rows[[field]][!is.na(rows[[field]])], split = ";"))
+    vals <- trimws(vals)
+    vals[nzchar(vals) & vals != "NA"]
+}
 
 obj.list <- lapply(obj.list, function(seu) {
     md <- seu@meta.data
-    message("Filtering: ", seu@project.name)
+    sample.name <- seu@project.name
+    rows <- qc.df[qc.df$sampleName == sample.name, , drop = FALSE]
+    if (nrow(rows) == 0) {
+        message("Filtering: ", sample.name, " -- no row in ", argv$qc.sheet, ", keeping all ", ncol(seu), " cells")
+        return(seu)
+    }
+    message("Filtering: ", sample.name)
 
-    # identify clusters to remove entirely
-    clus.to.remove <- unique(as.character(qc.df$cluster.to.remove[which(seu@project.name == qc.df$sampleName)]))
-    if(!(is.na(clus.to.remove))){
-        clus.to.remove <- as.numeric(unlist(strsplit(clus.to.remove, split = ";")))
-        cells.in.clusters.to.remove <- rownames(md)[md$seurat_clusters %in% clus.to.remove]
-    } else {
-        cells.in.clusters.to.remove <- c()
+    # whole clusters to remove
+    clus.to.remove <- PoolQCField(rows, "cluster.to.remove")
+    cells.in.clusters.to.remove <- rownames(md)[as.character(md$seurat_clusters) %in% clus.to.remove]
+
+    # threshold filters: vars/values/directions pair up by position
+    vars.to.filter.by <- PoolQCField(rows, "vars.to.filter.by")
+    var.filter <- PoolQCField(rows, "var.filter")
+    filter.direction <- PoolQCField(rows, "filter.direction")
+    if (length(unique(c(length(vars.to.filter.by), length(var.filter), length(filter.direction)))) != 1) {
+        stop("qc_df for ", sample.name, ": vars.to.filter.by (", length(vars.to.filter.by), "), var.filter (",
+             length(var.filter), ") and filter.direction (", length(filter.direction),
+             ") must have the same number of values")
+    }
+    missing.vars <- setdiff(vars.to.filter.by, colnames(md))
+    if (length(missing.vars) > 0) {
+        stop("qc_df for ", sample.name, ": metadata column(s) not found: ", paste(missing.vars, collapse = ", "),
+             ". Available: ", paste(colnames(md), collapse = ", "))
+    }
+    bad.directions <- setdiff(filter.direction, c("greater", "less"))
+    if (length(bad.directions) > 0) {
+        stop("qc_df for ", sample.name, ": filter.direction must be 'greater' or 'less', got: ",
+             paste(bad.directions, collapse = ", "))
+    }
+    thresholds <- suppressWarnings(as.numeric(var.filter))
+    if (any(is.na(thresholds))) {
+        stop("qc_df for ", sample.name, ": non-numeric var.filter value(s): ",
+             paste(var.filter[is.na(thresholds)], collapse = ", "))
     }
 
-
-    # identify variables to filter data by
-    vars.to.filter.by <- as.character(qc.df$vars.to.filter.by[which(seu@project.name == qc.df$sampleName)])
-    vars.to.filter.by <- unlist(strsplit(vars.to.filter.by, split = ";"))
-    var.filter <- as.character(qc.df$var.filter[which(seu@project.name == qc.df$sampleName)])
-    var.filter <- as.numeric(unlist(strsplit(var.filter, split = ";")))
-
-    # check if each vars.to.filter.by is greater than or less than var.filter in the same position
-    filter.direction <- as.character(qc.df$filter.direction[which(seu@project.name == qc.df$sampleName)])
-    filter.direction <- as.character(unlist(strsplit(filter.direction, split = ";")))
-    filter_list <- mapply(function(var, filter, direction) {
-        var.vector <- md[[var]]
-        if (direction == "greater") {
-            return(var.vector > filter)
+    keep <- rep(TRUE, nrow(md))
+    for (i in seq_along(vars.to.filter.by)) {
+        passes <- if (filter.direction[i] == "greater") {
+            md[[vars.to.filter.by[i]]] > thresholds[i]
         } else {
-            return(var.vector < filter)
+            md[[vars.to.filter.by[i]]] < thresholds[i]
         }
-    }, vars.to.filter.by, var.filter, filter.direction)
-
-    # combine all filters
-    filter_vector <- Reduce(`|`, filter_list)
-    cells.to.filter <- ifelse(length(filter_vector) > 0, rownames(md)[filter_vector], logical(0))
-    if(length(cells.in.clusters.to.remove) == 0) {
-        cells.to.remove <- cells.to.filter
-    } else if (length(cells.to.filter) == 0) {
-        cells.to.remove <- cells.in.clusters.to.remove
-    } else {
-        cells.to.remove <- c(cells.in.clusters.to.remove, cells.to.filter)
+        passes[is.na(passes)] <- FALSE
+        message("  keep ", vars.to.filter.by[i], " ", ifelse(filter.direction[i] == "greater", ">", "<"), " ",
+                thresholds[i], ": ", sum(!passes), " cells fail")
+        keep <- keep & passes
     }
+    cells.to.filter <- rownames(md)[!keep]
 
-    seu <- subset(seu, cells = cells.to.remove, invert = TRUE)
-    return(seu)
+    cells.to.remove <- union(cells.in.clusters.to.remove, cells.to.filter)
+    message("  removing ", length(cells.to.remove), " of ", nrow(md), " cells (",
+            length(cells.in.clusters.to.remove), " in clusters ", paste(clus.to.remove, collapse = ";"),
+            ", ", length(cells.to.filter), " failing thresholds)")
+    if (length(cells.to.remove) == 0) {
+        return(seu)
+    }
+    subset(seu, cells = setdiff(colnames(seu), cells.to.remove))
 })
+saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix, "-02-filter-obj-list.RDS"))

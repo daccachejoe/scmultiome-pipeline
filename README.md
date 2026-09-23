@@ -224,6 +224,24 @@ does this for you automatically if the file doesn't exist yet.
 | ctrl.1 | /path/to/cellranger/count-CTRL/outs | ctrl |
 | il17.1 | /path/to/cellranger/count-IL-17/outs | il17a |
 
+### qc_df.csv
+
+`configs/qc_df.csv` drives the `filter` step of stage 02. Give each sample
+one or more rows. Values from all of a sample's rows are pooled, and any
+field can also hold several `;`-separated values. `filter.direction` says
+which cells to **keep**, and a cell must pass every threshold. Samples
+with no row are merged unfiltered.
+
+| sampleName | cluster.to.remove | vars.to.filter.by | var.filter | filter.direction |
+| ---------- | ----------------- | ----------------- | ---------- | ---------------- |
+| ctrl.1 | NA | nFeature_ATAC | 500 | greater |
+| ctrl.1 | 3;7 | percent.mt | 25 | less |
+
+This keeps cells with `nFeature_ATAC > 500` and `percent.mt < 25`, and
+drops stage 01 clusters 3 and 7. A column name that doesn't exist in the
+object stops the job with the list of available columns. The filtered
+objects are saved as `{project_prefix}-02-filter-obj-list.RDS`.
+
 ## Scheduler support
 
 `run/runmultiome` auto-detects SLURM vs LSF (via `$SLURM_JOB_ID` /
