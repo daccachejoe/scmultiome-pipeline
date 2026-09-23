@@ -39,6 +39,10 @@ celltype_reference_h5ad=/path/to/shared/reference/Unicell_Reference.h5ad
 r_libs_personal_path=/path/to/R/x86_64-pc-linux-gnu-library/4.2
 scenicplus_tmp_dir=/path/to/scratch/your_username
 
+# ---- API tokens (keep these here, never in tracked scripts) ----
+# UCDeconvolve API token, read by scripts/03_ucd_deconvolve.py (stage 03)
+ucd_api_token=
+
 # ---- Scheduler ----
 slurm_partition=a100_short
 lsf_project=acc_naiklab

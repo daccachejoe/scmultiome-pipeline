@@ -2,25 +2,32 @@
 
 # ucdenv script from an h5ad file
 import argparse
+import os
+import sys
 import scanpy as sc
 import ucdeconvolve as ucd
 
 # parse argument
 parser = argparse.ArgumentParser(description = "UCDenvolve on a single sample")
 # input yaml file
-parser.add_argument("resolution",  help = "resolution to group cells by for cell type calling", default = "seurat_clusters")
-parser.add_argument("input_file",  help = "input file name")
-parser.add_argument("reference_file",  help = "reference file name", default = None)
+# named flags, matching how routes/03_identify_celltypes.sh calls this script
+parser.add_argument("--resolution", default = "seurat_clusters", help = "metadata column to group cells by for cell type calling")
+parser.add_argument("--input_file", required = True, help = "input h5ad file name")
+parser.add_argument("--reference_file", default = None, help = "optional reference h5ad; empty or omitted skips the referenced run")
 args = parser.parse_args()
 
-# use api token to log into database
-ucd.api.authenticate("454dd14a288146dd86a578f2a7a20ded151f2dafb7610e34da16b07549946033")
+# the API token comes from ucd_api_token in config/pipeline.config (exported
+# by run/runmultiome) rather than being hardcoded in this tracked file
+api_token = os.environ.get("ucd_api_token", "")
+if not api_token:
+    sys.exit("ucd_api_token is not set -- add it to config/pipeline.config (see pipeline.config.example).")
+ucd.api.authenticate(api_token)
 
 def ReadinObjects(args):
-    # read in the objects
+    # read in the objects; the reference is optional
     adata = sc.read_h5ad(args.input_file)
-    hannifa_reference = sc.read_h5ad(args.reference_file)
-    return(adata, hannifa_reference)
+    reference = sc.read_h5ad(args.reference_file) if args.reference_file else None
+    return(adata, reference)
 
 
 def run_unbiased(adata):
@@ -86,7 +93,7 @@ def __main__():
     adata, reference_data = ReadinObjects(args)
     run_unbiased(adata)
 
-    if args.reference_file is not None:
+    if reference_data is not None:
         run_referenced(adata, reference_data)
 
 

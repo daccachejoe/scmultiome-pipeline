@@ -17,13 +17,15 @@ resolution = cli[[2]]
 ucDenv.MD <- read.csv(infile, row.names = 1)
 plot <- 
     ucDenv.MD %>%
-    ggplot(aes(x = resolution, 
+    # resolution is a column name passed as a string, so look it up with
+    # .data[[]] -- aes(x = resolution) would plot the string itself
+    ggplot(aes(x = .data[[make.names(resolution)]], 
         y = pred_celltype_ucdbase, 
         color = pred_celltype_ucdbase)) +
     geom_jitter() +
     theme_classic() +
     NoLegend() +
-  theme(axis.text = element_text(color = "black", size = "black"))
+  theme(axis.text = element_text(color = "black"))
 
 pdf("./output/ucd/cluster-to-UCD-unbiased.pdf", height = 8, width = 8)
 plot
