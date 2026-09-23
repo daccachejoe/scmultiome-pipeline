@@ -15,14 +15,14 @@ fi
 
 if [ -f "data/raw/souporcell/out_gex/barcode-assignment-df.csv" ]; then
     scripts/seurat_signac_pipeline.R \
-        init,create,callpeaks,qc \
+        init,create,doublets,callpeaks,qc \
         configs/samplesheet.csv \
         --project_prefix $project_prefix \
         -m $my_macs_path \
         --SoupOrCellDF data/raw/souporcell/out_gex/barcode-assignment-df.csv 
 else
     scripts/seurat_signac_pipeline.R \
-        init,create,callpeaks,qc \
+        init,create,doublets,callpeaks,qc \
         configs/samplesheet.csv \
         --project_prefix $project_prefix \
         -m $my_macs_path

@@ -33,8 +33,8 @@ corresponding `routes/*.sh` script.
 | # | `run/runmultiome` stage | What it does | Route | Key script(s) |
 |---|---|---|---|---|
 | 00 | `init` | Set up project directories, bootstrap `config/pipeline.config`, install R deps | `routes/00_setup_dirs.sh`, `routes/00_install.sh` | -- |
-| 01 | `seurat_preprocess` | Per-sample: create Seurat objects, QC metrics, MACS peak calling, QC plots | `routes/01_seurat_preprocess.sh` | `scripts/seurat_signac_pipeline.R` |
-| 02 | `run_merged_pipeline` | Filter samples per `configs/qc_df.csv`, merge into one object with a consensus peak set + clustering | `routes/02_merge_pipeline.sh` | `scripts/seurat_signac_pipeline.R` |
+| 01 | `seurat_preprocess` | Per-sample: create Seurat objects, QC metrics, RNA + ATAC doublet calling, MACS peak calling, QC plots | `routes/01_seurat_preprocess.sh` | `scripts/seurat_signac_pipeline.R` |
+| 02 | `run_merged_pipeline` | Remove doublets, filter samples per `configs/qc_df.csv`, merge into one object with a consensus peak set + clustering | `routes/02_merge_pipeline.sh` | `scripts/seurat_signac_pipeline.R` |
 | 03 | `identify_celltypes` | UCDeconvolve-assisted cell type calling (human then fills in `configs/cluster_labels.csv`) | `routes/03_identify_celltypes.sh` | `scripts/03_convert_seurat_to_h5ad.R`, `scripts/03_ucd_deconvolve.py`, `scripts/03_plot_ucd_results.R` |
 | 04 | `label_celltypes` | Apply your cluster -> cell-type labels (`configs/cluster_labels.csv`) | `routes/04_label_celltypes.sh` | `scripts/04_label_celltypes.R` |
 | 05 | `call_peaks_grouped` | Re-call ATAC peaks grouped by cell type -- **branch point for the optional stages below** | `routes/05_call_peaks_grouped.sh` | `scripts/seurat_signac_pipeline.R` |
@@ -230,7 +230,8 @@ does this for you automatically if the file doesn't exist yet.
 one or more rows. Values from all of a sample's rows are pooled, and any
 field can also hold several `;`-separated values. `filter.direction` says
 which cells to **keep**, and a cell must pass every threshold. Samples
-with no row are merged unfiltered.
+with no row skip these filters. Stage 01's doublets are removed before
+`qc_df` is applied (see [Doublets](#doublets)).
 
 | sampleName | cluster.to.remove | vars.to.filter.by | var.filter | filter.direction |
 | ---------- | ----------------- | ----------------- | ---------- | ---------------- |
@@ -241,6 +242,32 @@ This keeps cells with `nFeature_ATAC > 500` and `percent.mt < 25`, and
 drops stage 01 clusters 3 and 7. A column name that doesn't exist in the
 object stops the job with the list of available columns. The filtered
 objects are saved as `{project_prefix}-02-filter-obj-list.RDS`.
+
+### Doublets
+
+Stage 01 scores doublets in each sample (one 10x capture) and stage 02
+removes them. A cell is removed if **both** modalities call it a doublet,
+or if souporcell calls it a genotype doublet:
+
+| Evidence | Method | Call |
+| --- | --- | --- |
+| RNA | scDblFinder on RNA counts | scDblFinder's own threshold (expected rate scales with cell number) |
+| ATAC | scDblFinder in ATAC mode + AMULET, combined by Fisher's method (per the scDblFinder scATAC vignette) | combined p < `doublet_atac_combined_p` (default 0.05) |
+| Genotype | souporcell `status == "doublet"` for samples in `configs/demultiplexing_paths.csv` (`sampleName,demux_path` to `clusters.tsv`) | always removed |
+
+Requiring RNA and ATAC to agree is deliberate. Cells flagged by only one
+assay are often real, unusual cells (large, very active or rare types),
+and single-method filters are where real biology gets removed. Every cell
+keeps its scores and a `doublet.evidence` label (`souporcell`, `rna+atac`,
+`rna only`, `atac only`, `none`), so the kept one-assay cells can be
+reviewed. Before running stage 02, check:
+
+- `output/tables/{prefix}-01-doublet-summary.csv`: counts per evidence type and % removed per sample
+- `output/plots/{prefix}-01-doublet-plots.pdf`: RNA score vs. ATAC evidence per sample
+- `output/tables/{prefix}-01-doublet-calls.csv`: per-cell scores and calls
+
+Set `remove_doublets=false` in `config/pipeline.config` to keep doublets
+through stage 02. The calls stay in the metadata either way.
 
 ## Scheduler support
 

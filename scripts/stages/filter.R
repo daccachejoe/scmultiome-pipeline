@@ -1,7 +1,9 @@
 # Stage: filter
-# Removes cells per configs/qc_df.csv (whole clusters to drop, plus
-# threshold-based filters on arbitrary metadata columns), then saves the
-# filtered per-sample objects as the stage 02 filter checkpoint.
+# Removes doublets called in stage 01 (doublet.call == "doublet", see
+# scripts/stages/doublets.R; skipped with remove_doublets=false in
+# config/pipeline.config), then cells per configs/qc_df.csv (whole clusters
+# to drop, plus threshold-based filters on arbitrary metadata columns), and
+# saves the filtered per-sample objects as the stage 02 filter checkpoint.
 # Sourced by scripts/seurat_signac_pipeline.R.
 #
 # qc_df.csv format: one or more rows per sampleName. Within a row,
@@ -11,10 +13,11 @@
 #   nFeature_ATAC,500,greater  -> keep cells with nFeature_ATAC > 500
 #   percent.mt,25,less         -> keep cells with percent.mt < 25
 # A cell is kept only if it passes every threshold (and has no NA in the
-# metrics being tested). Samples with no qc_df row are passed through
-# unfiltered, with a message, rather than crashing.
+# metrics being tested). Samples with no qc_df row skip these filters, with a
+# message, rather than crashing (doublet removal still applies).
 
 message("Running Filtering Pipeline")
+remove.doublets <- !tolower(Sys.getenv("remove_doublets", unset = "true")) %in% c("false", "f", "0", "no")
 qc.df <- read.csv(file = argv$qc.sheet, colClasses = "character", na.strings = c("NA", ""))
 
 # pool a qc_df column across a sample's rows, splitting ";"-joined values and
@@ -26,11 +29,20 @@ PoolQCField <- function(rows, field) {
 }
 
 obj.list <- lapply(obj.list, function(seu) {
-    md <- seu@meta.data
     sample.name <- seu@project.name
+    if (remove.doublets) {
+        if ("doublet.call" %in% colnames(seu@meta.data)) {
+            n.doublets <- sum(seu$doublet.call == "doublet", na.rm = TRUE)
+            message("Filtering: ", sample.name, " -- removing ", n.doublets, " doublets called in stage 01")
+            if (n.doublets > 0) seu <- subset(seu, cells = colnames(seu)[seu$doublet.call != "doublet"])
+        } else {
+            message("Filtering: ", sample.name, " -- no doublet.call column (stage 01 ran without the doublets stage)")
+        }
+    }
+    md <- seu@meta.data
     rows <- qc.df[qc.df$sampleName == sample.name, , drop = FALSE]
     if (nrow(rows) == 0) {
-        message("Filtering: ", sample.name, " -- no row in ", argv$qc.sheet, ", keeping all ", ncol(seu), " cells")
+        message("Filtering: ", sample.name, " -- no row in ", argv$qc.sheet, ", skipping threshold and cluster filters (", ncol(seu), " cells)")
         return(seu)
     }
     message("Filtering: ", sample.name)

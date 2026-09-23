@@ -20,7 +20,9 @@ BiocManager::install(c(
   "BSgenome.Mmusculus.UCSC.mm10", # for species=mouse
   "motifmatchr",
   "TFBSTools",
-  "JASPAR2020"
+  "JASPAR2020",
+  "scDblFinder",                 # stage 01 doublet detection (RNA, ATAC mode, AMULET)
+  "SingleCellExperiment"
 ), update = FALSE, ask = FALSE)
 
 install.packages(c(

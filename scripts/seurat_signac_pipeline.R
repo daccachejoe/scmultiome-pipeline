@@ -12,7 +12,7 @@ p <- arg_parser("Run single-cell RNA + ATAC Multiomic Analysis from 10X Genomics
 
 # Add required command line arguments
 p <- add_argument(p, "pipeline",
-                help="Comma delimted combinations of: init, create, callpeaks, qc, filter, cluster, subcluster, merge, linkpeaks, footprint",
+                help="Comma delimted combinations of: init, create, doublets, callpeaks, qc, filter, cluster, subcluster, merge, linkpeaks, footprint",
                 type="character")
 p <- add_argument(p, "samplesheet", help="samplesheet in csv format", type="character")
 
@@ -96,6 +96,12 @@ if("init" %in% pipelines.to.run){
 if("create" %in% pipelines.to.run){
     message("=== Stage: create ===")
     source("scripts/stages/create.R")
+}
+
+# before the souporcell split below: doublet rates belong to the capture
+if("doublets" %in% pipelines.to.run){
+    message("=== Stage: doublets ===")
+    source("scripts/stages/doublets.R")
 }
 
 # Splitting up object(s) by SouporCell called assignment. Not a named

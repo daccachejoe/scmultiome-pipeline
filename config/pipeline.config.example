@@ -39,6 +39,14 @@ celltype_reference_h5ad=/path/to/shared/reference/Unicell_Reference.h5ad
 r_libs_personal_path=/path/to/R/x86_64-pc-linux-gnu-library/4.2
 scenicplus_tmp_dir=/path/to/scratch/your_username
 
+# ---- Doublets (stage 01 detection, stage 02 removal) ----
+# ATAC doublet evidence = Fisher-combined p of scDblFinder's ATAC-mode score
+# and AMULET; cells below this p count as ATAC doublets. A cell is removed
+# only if it is an RNA doublet AND an ATAC doublet (or a souporcell doublet).
+doublet_atac_combined_p=0.05
+# false keeps doublet-called cells through stage 02 (calls stay in metadata)
+remove_doublets=true
+
 # ---- API tokens (keep these here, never in tracked scripts) ----
 # UCDeconvolve API token, read by scripts/03_ucd_deconvolve.py (stage 03)
 ucd_api_token=
