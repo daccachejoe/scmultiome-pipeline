@@ -17,6 +17,19 @@
 #         catch different doublets (heterotypic vs. homotypic) and neither is
 #         best on every dataset. doublet.atac = combined p <
 #         doublet_atac_combined_p (config, default 0.05).
+#         AMULET is left out of the combination (score alone, Fisher with
+#         df = 2) when fewer than doublet_amulet_min_informative (config,
+#         default 0.02) of the sample's cells have any locus with >2
+#         fragments, or when AMULET fails. In such shallow libraries every
+#         cell's AMULET p is 1, and an all-1 term only raises the bar for the
+#         score (1 - score < 0.0087 instead of < 0.05) without adding
+#         information: on the PSO longitudinal v0 library (0.2% of cells
+#         informative) it cut ATAC-positive cells from 324 to 54. Libraries
+#         where AMULET does contribute were at ~5% (PSO v1/v2) and 30-60%
+#         (5376-AB-2, cntrl.2). Requiring both methods to agree was
+#         considered and rejected: most ATAC calls rest on one of them
+#         (e.g. 5376-AB-2: 147 score-driven, 253 AMULET-driven of 415), which
+#         is the complementarity the combination is for.
 #   Genotype  souporcell status == "doublet", for samples listed in
 #         configs/demultiplexing_paths.csv (sampleName,demux_path ->
 #         clusters.tsv). Only doublets between donors are detectable this way.
@@ -52,6 +65,11 @@ if (is.na(atac.p.threshold)) {
     stop("doublet_atac_combined_p in config/pipeline.config must be numeric, got: ",
          Sys.getenv("doublet_atac_combined_p"))
 }
+amulet.min.informative <- as.numeric(Sys.getenv("doublet_amulet_min_informative", unset = "0.02"))
+if (is.na(amulet.min.informative) || amulet.min.informative < 0 || amulet.min.informative > 1) {
+    stop("doublet_amulet_min_informative in config/pipeline.config must be a fraction in [0, 1], got: ",
+         Sys.getenv("doublet_amulet_min_informative"))
+}
 
 # souporcell calls, if any samples were genotype-demultiplexed
 demux.file <- "configs/demultiplexing_paths.csv"
@@ -66,9 +84,11 @@ amulet.exclude <- suppressWarnings(c(
 # Fisher's method on (1 - scDblFinder ATAC score) and the AMULET p-value,
 # flooring both at 0.001 so a single extreme value can't dominate (as in the
 # vignette); an NA score or AMULET p (not scored, too few fragments)
-# contributes no evidence
-CombineATACEvidence <- function(atac.score, amulet.p) {
-    p <- cbind(ifelse(is.na(atac.score), 1, 1 - atac.score), ifelse(is.na(amulet.p), 1, amulet.p))
+# contributes no evidence. use.amulet = FALSE combines the score alone (see
+# the header for when AMULET is dropped).
+CombineATACEvidence <- function(atac.score, amulet.p, use.amulet = TRUE) {
+    p <- cbind(ifelse(is.na(atac.score), 1, 1 - atac.score))
+    if (use.amulet) p <- cbind(p, ifelse(is.na(amulet.p), 1, amulet.p))
     p[p < 0.001] <- 0.001
     pchisq(-2 * rowSums(log(p)), df = 2 * ncol(p), lower.tail = FALSE)
 }
@@ -85,6 +105,7 @@ StepTimer <- function() {
     }
 }
 
+amulet.info <- list()
 obj.list <- lapply(obj.list, function(seu) {
     sample.name <- seu@project.name
     step.done <- StepTimer()
@@ -154,6 +175,15 @@ obj.list <- lapply(obj.list, function(seu) {
         ppois(amulet.res[colnames(seu), "nAbove2"] - 1, amulet.lambda, lower.tail = FALSE)
     }
     step.done("AMULET done")
+    amulet.informative <- if (is.null(amulet.res)) NA_real_ else mean(amulet.res[colnames(seu), "nAbove2"] > 0)
+    use.amulet <- !is.na(amulet.informative) && amulet.informative >= amulet.min.informative
+    if (!is.null(amulet.res) && !use.amulet) {
+        message("  AMULET not used: ", round(100 * amulet.informative, 2), "% of cells have any locus with >2 fragments (< ",
+                100 * amulet.min.informative, "%, doublet_amulet_min_informative); ATAC evidence = scDblFinder score alone")
+    }
+    amulet.info[[sample.name]] <<- data.frame(sample = sample.name,
+                                              amulet.informative.pct = round(100 * amulet.informative, 2),
+                                              amulet.used = use.amulet)
 
     # unname(): Seurat's $<- rejects named vectors whose names don't match the cells
 
@@ -161,7 +191,7 @@ obj.list <- lapply(obj.list, function(seu) {
     seu$doublet.rna <- unname(rna.sce$scDblFinder.class == "doublet")
     seu$doublet.atac.score <- unname(atac.sce$scDblFinder.score)
     seu$doublet.amulet.p <- unname(amulet.p)
-    seu$doublet.atac.combined.p <- CombineATACEvidence(seu$doublet.atac.score, seu$doublet.amulet.p)
+    seu$doublet.atac.combined.p <- CombineATACEvidence(seu$doublet.atac.score, seu$doublet.amulet.p, use.amulet)
     seu$doublet.atac <- seu$doublet.atac.combined.p < atac.p.threshold
     seu$doublet.souporcell <- souporcell.doublet
 
@@ -190,6 +220,7 @@ write.csv(doublet.md, file = paste0("output/tables/", argv$project_prefix, "-01-
 doublet.summary <- as.data.frame.matrix(table(doublet.md$sample, doublet.md$doublet.evidence))
 doublet.summary <- data.frame(sample = rownames(doublet.summary), doublet.summary, check.names = FALSE,
                               pct.removed = round(100 * tapply(doublet.md$doublet.call == "doublet", doublet.md$sample, mean), 2))
+doublet.summary <- merge(doublet.summary, dplyr::bind_rows(amulet.info), by = "sample", all.x = TRUE, sort = FALSE)
 write.csv(doublet.summary, file = paste0("output/tables/", argv$project_prefix, "-01-doublet-summary.csv"), row.names = FALSE)
 
 # RNA vs. ATAC evidence per sample; removed cells are the souporcell and
@@ -204,7 +235,9 @@ for (seu in obj.list) {
                          cols = evidence.cols, pt.size = 0.3, shuffle = TRUE) +
           geom_hline(yintercept = -log10(atac.p.threshold), linetype = "dashed") +
           labs(title = seu@project.name, x = "scDblFinder RNA score", color = "Doublet evidence",
-               y = "ATAC evidence, -log10 combined p (scDblFinder ATAC + AMULET)"))
+               y = if (isTRUE(amulet.info[[seu@project.name]]$amulet.used))
+                       "ATAC evidence, -log10 combined p (scDblFinder ATAC + AMULET)"
+                   else "ATAC evidence, -log10 p (scDblFinder ATAC score alone; AMULET not used)"))
 }
 dev.off()
 

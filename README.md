@@ -286,7 +286,7 @@ or if souporcell calls it a genotype doublet:
 | Evidence | Method | Call |
 | --- | --- | --- |
 | RNA | scDblFinder on RNA counts (SoupX-corrected when available) | scDblFinder's own threshold (expected rate scales with cell number) |
-| ATAC | scDblFinder in ATAC mode + AMULET, combined by Fisher's method (per the scDblFinder scATAC vignette) | combined p < `doublet_atac_combined_p` (default 0.05) |
+| ATAC | scDblFinder in ATAC mode + AMULET, combined by Fisher's method (per the scDblFinder scATAC vignette) | combined p < `doublet_atac_combined_p` (default 0.05). AMULET is left out, and the score used alone, when fewer than `doublet_amulet_min_informative` (default 2%) of cells have any locus with >2 fragments |
 | Genotype | souporcell `status == "doublet"` for samples in `configs/demultiplexing_paths.csv` (`sampleName,demux_path` to `clusters.tsv`) | always removed |
 
 Requiring RNA and ATAC to agree is deliberate. Cells flagged by only one
@@ -296,7 +296,7 @@ keeps its scores and a `doublet.evidence` label (`souporcell`, `rna+atac`,
 `rna only`, `atac only`, `none`), so the kept one-assay cells can be
 reviewed. Before running stage 02, check:
 
-- `output/tables/{prefix}-01-doublet-summary.csv`: counts per evidence type and % removed per sample
+- `output/tables/{prefix}-01-doublet-summary.csv`: counts per evidence type and % removed per sample, plus the % of cells AMULET could score and whether it was used
 - `output/plots/{prefix}-01-doublet-plots.pdf`: RNA score vs. ATAC evidence per sample
 - `output/tables/{prefix}-01-doublet-calls.csv`: per-cell scores and calls
 

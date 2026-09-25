@@ -54,6 +54,10 @@ ambient_rna_rho=
 # and AMULET; cells below this p count as ATAC doublets. A cell is removed
 # only if it is an RNA doublet AND an ATAC doublet (or a souporcell doublet).
 doublet_atac_combined_p=0.05
+# AMULET joins the ATAC evidence only if at least this fraction of a sample's
+# cells have any locus with >2 fragments; in shallower libraries it is
+# uninformative and the scDblFinder ATAC score is used alone
+doublet_amulet_min_informative=0.02
 # false keeps doublet-called cells through stage 02 (calls stay in metadata)
 remove_doublets=true
 
