@@ -143,7 +143,16 @@ obj.list <- lapply(obj.list, function(seu) {
                     "); using the scDblFinder ATAC score alone for ATAC evidence")
             NULL
         })
-    amulet.p <- if (is.null(amulet.res)) rep(NA_real_, ncol(seu)) else amulet.res[colnames(seu), "p.value"]
+    # p recomputed as P(X >= nAbove2): scDblFinder 1.12's amulet() uses
+    # ppois(nAbove2, lambda, lower.tail = FALSE) = P(X > n), so a cell with no
+    # evidence (n = 0) gets p = 1 - exp(-lambda) instead of 1. In shallow
+    # libraries lambda is tiny and every cell looks significant: on the PSO
+    # longitudinal v0 library all cells had p = 0.0024 and all 5,947 were
+    # called ATAC doublets.
+    amulet.p <- if (is.null(amulet.res)) rep(NA_real_, ncol(seu)) else {
+        amulet.lambda <- mean(amulet.res$nAbove2)
+        ppois(amulet.res[colnames(seu), "nAbove2"] - 1, amulet.lambda, lower.tail = FALSE)
+    }
     step.done("AMULET done")
 
     # unname(): Seurat's $<- rejects named vectors whose names don't match the cells
