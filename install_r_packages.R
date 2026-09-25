@@ -36,6 +36,8 @@ install.packages(c(
   "future",
   "future.apply",
   "enrichR",
+  "SoupX",  # stage 01 ambient RNA correction
+  "hdf5r",  # Read10X_h5 for Cell Ranger raw_feature_bc_matrix.h5
   "MASS" # only needed if scripts/density-scatter-function.R is wired in
 ))
 

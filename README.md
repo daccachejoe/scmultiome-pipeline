@@ -33,7 +33,7 @@ corresponding `routes/*.sh` script.
 | # | `run/runmultiome` stage | What it does | Route | Key script(s) |
 |---|---|---|---|---|
 | 00 | `init` | Set up project directories, bootstrap `config/pipeline.config`, install R deps | `routes/00_setup_dirs.sh`, `routes/00_install.sh` | -- |
-| 01 | `seurat_preprocess` | Per-sample: create Seurat objects, QC metrics, RNA + ATAC doublet calling, MACS peak calling, QC plots | `routes/01_seurat_preprocess.sh` | `scripts/seurat_signac_pipeline.R` |
+| 01 | `seurat_preprocess` | Per-sample: create Seurat objects, QC metrics, ambient RNA correction (SoupX) + ambient ATAC estimate, RNA + ATAC doublet calling, MACS peak calling, QC plots | `routes/01_seurat_preprocess.sh` | `scripts/seurat_signac_pipeline.R` |
 | 02 | `run_merged_pipeline` | Remove doublets, filter samples per `configs/qc_df.csv`, merge into one object with a consensus peak set + clustering | `routes/02_merge_pipeline.sh` | `scripts/seurat_signac_pipeline.R` |
 | 03 | `identify_celltypes` | UCDeconvolve-assisted cell type calling (human then fills in `configs/cluster_labels.csv`) | `routes/03_identify_celltypes.sh` | `scripts/03_convert_seurat_to_h5ad.R`, `scripts/03_ucd_deconvolve.py`, `scripts/03_plot_ucd_results.R` |
 | 04 | `label_celltypes` | Apply your cluster -> cell-type labels (`configs/cluster_labels.csv`) | `routes/04_label_celltypes.sh` | `scripts/04_label_celltypes.R` |
@@ -243,6 +243,40 @@ drops stage 01 clusters 3 and 7. A column name that doesn't exist in the
 object stops the job with the list of available columns. The filtered
 objects are saved as `{project_prefix}-02-filter-obj-list.RDS`.
 
+### Ambient RNA / DNA
+
+Stage 01 corrects ambient RNA in each sample before doublet detection, so
+doublet scoring sees corrected counts. It uses
+[SoupX](https://github.com/constantAmateur/SoupX) with Cell Ranger's
+`raw_feature_bc_matrix` (`.h5` or directory), looked up at the samplesheet
+`path` and then in `data/raw/<sample>/`. Samples without a raw matrix are
+skipped with a warning and stay uncorrected.
+
+- The soup profile comes from empty droplets (0 < nUMI < 100). The
+  contamination fraction (rho) is estimated per sample by `autoEstCont`
+  using quick per-sample clusters (`ambient.cluster`).
+- Corrected counts (rounded to integers) replace the `RNA` assay's counts.
+  The originals are kept in an `RNA.raw` assay (carried through the
+  stage 02 merge) and as `nCount_RNA.raw` / `nFeature_RNA.raw`.
+  `percent.mt` stays on the uncorrected counts.
+- `ambient_rna_correction=false` only estimates and reports rho.
+  `ambient_rna_rho=0.1` fixes rho for every sample (use it when
+  `autoEstCont` fails or gives an implausible value).
+
+ATAC counts are **not** corrected. There is no established ambient
+correction for near-binary per-cell ATAC counts. Instead each cell gets
+`ambient.atac.sim` (cosine similarity of its peaks to the empty-droplet
+peak profile) and `ambient.atac.z` (that similarity as a robust z-score
+within its quick cluster, since the raw similarity mostly tracks cell
+type). A high `ambient.atac.z` flags cells that look more ambient than
+their peers. Use it in `qc_df.csv` if a sample needs it (e.g.
+`ambient.atac.z,3,less`).
+
+Review before stage 02:
+
+- `output/tables/{prefix}-01-ambient-summary.csv`: per sample method, rho, % RNA UMIs removed, RNA/ATAC ambient load (fraction of counts outside cells), top soup genes
+- `output/plots/{prefix}-01-ambient-plots.pdf`: RNA fraction removed and ATAC ambient z per quick cluster
+
 ### Doublets
 
 Stage 01 scores doublets in each sample (one 10x capture) and stage 02
@@ -251,7 +285,7 @@ or if souporcell calls it a genotype doublet:
 
 | Evidence | Method | Call |
 | --- | --- | --- |
-| RNA | scDblFinder on RNA counts | scDblFinder's own threshold (expected rate scales with cell number) |
+| RNA | scDblFinder on RNA counts (SoupX-corrected when available) | scDblFinder's own threshold (expected rate scales with cell number) |
 | ATAC | scDblFinder in ATAC mode + AMULET, combined by Fisher's method (per the scDblFinder scATAC vignette) | combined p < `doublet_atac_combined_p` (default 0.05) |
 | Genotype | souporcell `status == "doublet"` for samples in `configs/demultiplexing_paths.csv` (`sampleName,demux_path` to `clusters.tsv`) | always removed |
 

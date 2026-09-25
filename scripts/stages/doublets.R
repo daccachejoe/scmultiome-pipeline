@@ -7,7 +7,8 @@
 # any souporcell split, since doublet rates are a property of the capture.
 #
 # Evidence, per cell:
-#   RNA   scDblFinder on RNA counts -> doublet.rna (scDblFinder's own
+#   RNA   scDblFinder on RNA counts (SoupX-corrected when the ambient stage
+#         ran before this one) -> doublet.rna (scDblFinder's own
 #         threshold, which scales the expected rate with the capture's cell
 #         number, ~1% per 1000 cells).
 #   ATAC  scDblFinder in ATAC mode (aggregated peak features) combined with

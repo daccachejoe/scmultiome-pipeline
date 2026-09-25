@@ -58,7 +58,8 @@ names(feat.mat.list) <- names(frag.paths)
 obj.list <- lapply(names(frag.paths),function(f.path.name){
     seu <- obj.list[[f.path.name]]
     DefaultAssay(seu) <- "RNA"
-    seu <- DietSeurat(seu, assays = c("RNA", "SCT"))
+    # RNA.raw: pre-SoupX counts from stage 01's ambient step, when it ran
+    seu <- DietSeurat(seu, assays = intersect(c("RNA", "RNA.raw", "SCT"), names(seu@assays)))
     seu[["peaks"]] <-
         CreateChromatinAssay(
                 counts = feat.mat.list[[f.path.name]],

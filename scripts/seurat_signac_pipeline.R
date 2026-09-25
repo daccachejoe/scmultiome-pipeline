@@ -12,7 +12,7 @@ p <- arg_parser("Run single-cell RNA + ATAC Multiomic Analysis from 10X Genomics
 
 # Add required command line arguments
 p <- add_argument(p, "pipeline",
-                help="Comma delimted combinations of: init, create, doublets, callpeaks, qc, filter, cluster, subcluster, merge, linkpeaks, footprint",
+                help="Comma delimted combinations of: init, create, ambient, doublets, callpeaks, qc, filter, cluster, subcluster, merge, linkpeaks, footprint",
                 type="character")
 p <- add_argument(p, "samplesheet", help="samplesheet in csv format", type="character")
 
@@ -98,7 +98,14 @@ if("create" %in% pipelines.to.run){
     source("scripts/stages/create.R")
 }
 
-# before the souporcell split below: doublet rates belong to the capture
+# ambient then doublets, both before the souporcell split below: the soup
+# and the doublet rate belong to the capture, and doublet scoring should see
+# ambient-corrected RNA
+if("ambient" %in% pipelines.to.run){
+    message("=== Stage: ambient ===")
+    source("scripts/stages/ambient.R")
+}
+
 if("doublets" %in% pipelines.to.run){
     message("=== Stage: doublets ===")
     source("scripts/stages/doublets.R")

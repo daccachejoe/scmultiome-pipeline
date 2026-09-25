@@ -39,6 +39,16 @@ celltype_reference_h5ad=/path/to/shared/reference/Unicell_Reference.h5ad
 r_libs_personal_path=/path/to/R/x86_64-pc-linux-gnu-library/4.2
 scenicplus_tmp_dir=/path/to/scratch/your_username
 
+# ---- Ambient RNA / DNA (stage 01, before doublet detection) ----
+# SoupX on Cell Ranger's raw_feature_bc_matrix (looked up at the samplesheet
+# path, then data/raw/<sample>/); samples without one stay uncorrected.
+# true replaces RNA counts with the corrected ones (originals kept in the
+# RNA.raw assay); false only estimates and reports the contamination.
+ambient_rna_correction=true
+# Empty = SoupX autoEstCont per sample. A number in [0, 1) fixes the
+# contamination fraction for every sample (e.g. 0.1 when autoEstCont fails).
+ambient_rna_rho=
+
 # ---- Doublets (stage 01 detection, stage 02 removal) ----
 # ATAC doublet evidence = Fisher-combined p of scDblFinder's ATAC-mode score
 # and AMULET; cells below this p count as ATAC doublets. A cell is removed
