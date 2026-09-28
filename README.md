@@ -239,7 +239,22 @@ with no row skip these filters. Stage 01's doublets are removed before
 | ctrl.1 | 3;7 | percent.mt | 25 | less |
 
 This keeps cells with `nFeature_ATAC > 500` and `percent.mt < 25`, and
-drops stage 01 clusters 3 and 7. A column name that doesn't exist in the
+drops stage 01 clusters 3 and 7.
+
+`var.filter` can also be `auto` on an `nFeature_peaks` (or
+`nFeature_ATAC`) row with direction `greater`. The cutoff is then set from
+that sample's ATAC depth:
+`max(50, min(200, round(0.25 × median nFeature_peaks)))`, with the median
+over its non-doublet cells. Deep libraries keep 200, and shallower ones get a
+proportionally lower bar instead of losing a large share of good cells (a
+fixed 200 removed 43% of one library whose median was 232 peaks). The
+constants are `adaptive_peak_cutoff_max` / `_fraction` / `_floor` in
+`config/pipeline.config`, and the cutoffs used are written to
+`output/tables/{prefix}-02-adaptive-peak-cutoffs.csv`.
+
+| sampleName | cluster.to.remove | vars.to.filter.by | var.filter | filter.direction |
+| ---------- | ----------------- | ----------------- | ---------- | ---------------- |
+| ctrl.1 | NA | nFeature_peaks | adaptive | greater | A column name that doesn't exist in the
 object stops the job with the list of available columns. The filtered
 objects are saved as `{project_prefix}-02-filter-obj-list.RDS`.
 
