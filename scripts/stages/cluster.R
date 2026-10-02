@@ -35,11 +35,12 @@ lapply(obj.list, function(obj){
     p3 <- DimPlot(obj, reduction = "umap.atac", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("ATAC") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
     p4 <- DimPlot(obj, reduction = "wnn.umap", group.by = "wsnn_res.0.5", label = TRUE, label.size = 5, repel = FALSE) + ggtitle("WNN") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
 
-    if(!(argv$SoupOrCellDF == "NA")){
-        p5 <- DimPlot(obj, reduction = "pca", group.by = "assignment", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("PCA") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
-        p6 <- DimPlot(obj, reduction = "umap.rna", group.by = "assignment", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("RNA") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
-        p7 <- DimPlot(obj, reduction = "umap.atac", group.by = "assignment", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("ATAC") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
-        p8 <- DimPlot(obj, reduction = "wnn.umap", group.by = "assignment", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("WNN")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
+    # per-donor panels when stage 02 donors ran (genotype-pooled libraries)
+    if("donor" %in% colnames(obj@meta.data)){
+        p5 <- DimPlot(obj, reduction = "pca", group.by = "donor", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("PCA") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
+        p6 <- DimPlot(obj, reduction = "umap.rna", group.by = "donor", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("RNA") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
+        p7 <- DimPlot(obj, reduction = "umap.atac", group.by = "donor", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("ATAC") + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
+        p8 <- DimPlot(obj, reduction = "wnn.umap", group.by = "donor", label = FALSE, label.size = 5, repel = FALSE) + ggtitle("WNN")  + NoLegend() + theme(plot.title = element_text(hjust = 0.5))
         print(
             ggpubr::ggarrange(
                 ggpubr::ggarrange(p1, p2, p3, p4, ncol = 4, nrow = 1),

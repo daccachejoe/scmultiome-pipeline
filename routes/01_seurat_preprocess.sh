@@ -13,20 +13,13 @@ fi
 # pc
 # conda activate $conda_env_name
 
-if [ -f "data/raw/souporcell/out_gex/barcode-assignment-df.csv" ]; then
-    scripts/seurat_signac_pipeline.R \
-        init,create,ambient,doublets,callpeaks,qc \
-        configs/samplesheet.csv \
-        --project_prefix $project_prefix \
-        -m $my_macs_path \
-        --SoupOrCellDF data/raw/souporcell/out_gex/barcode-assignment-df.csv 
-else
-    scripts/seurat_signac_pipeline.R \
-        init,create,ambient,doublets,callpeaks,qc \
-        configs/samplesheet.csv \
-        --project_prefix $project_prefix \
-        -m $my_macs_path
-fi
+# genotype-pooled libraries: run the optional stage 00b (run/runmultiome
+# demultiplex) first; doublets reads its calls via configs/demultiplexing_paths.csv
+scripts/seurat_signac_pipeline.R \
+    init,create,ambient,doublets,callpeaks,qc \
+    configs/samplesheet.csv \
+    --project_prefix $project_prefix \
+    -m $my_macs_path
 
 
 

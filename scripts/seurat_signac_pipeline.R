@@ -24,8 +24,6 @@ p <- add_argument(p, "--RunHarmony",flag=TRUE, help="Run Harmony batch correctio
 p <- add_argument(p, "--footprint-peaks", help="atac peaks to run footprinting analysis on. txt file", type="character")
 p <- add_argument(p, "--my.macs.path", help="path to macs environment. only used if callpaks pipeline is run", type="character")
 p <- add_argument(p, "--qc.sheet", help="path to csv file containing clusters to remove per sample", type="character")
-p <- add_argument(p, "--SoupOrCellDF", help="path to csv file containing barcodes and their assigned samples", type="character", default="NA")
-p <- add_argument(p, "--qc.split", flag=TRUE, help="whether or not to perform qc clustering on objects individually or combined")
 
 
 # Parse the command line arguments
@@ -98,9 +96,8 @@ if("create" %in% pipelines.to.run){
     source("scripts/stages/create.R")
 }
 
-# ambient then doublets, both before the souporcell split below: the soup
-# and the doublet rate belong to the capture, and doublet scoring should see
-# ambient-corrected RNA
+# ambient then doublets: the soup and the doublet rate belong to the capture,
+# and doublet scoring should see ambient-corrected RNA
 if("ambient" %in% pipelines.to.run){
     message("=== Stage: ambient ===")
     source("scripts/stages/ambient.R")
@@ -109,46 +106,6 @@ if("ambient" %in% pipelines.to.run){
 if("doublets" %in% pipelines.to.run){
     message("=== Stage: doublets ===")
     source("scripts/stages/doublets.R")
-}
-
-# Splitting up object(s) by SouporCell called assignment. Not a named
-# pipeline stage -- runs whenever --SoupOrCellDF is set, between create
-# and callpeaks, same as in the original script.
-if(!(argv$SoupOrCellDF == "NA")){
-    souporcelldf <- read.csv(argv$SoupOrCellDF)
-    obj.list <-
-        lapply(obj.list,
-        function(obj){
-            souporcelldf <- souporcelldf[souporcelldf$barcode %in% colnames(obj), ] # This should be 100% for one object, less if one data frame is for multiple samplesheet instances
-            cells.not.in.SoC <- colnames(obj)[!(colnames(obj) %in% souporcelldf$barcode)]
-            residual.df <- data.frame(barcode = cells.not.in.SoC, assignment = "NA")
-            souporcelldf <- rbind(souporcelldf, residual.df)
-# after filter, before merge: per-sample objects still have plain Cell Ranger
-# barcodes as cell names, and merge carries the donor columns through
-if("donors" %in% pipelines.to.run){
-    message("=== Stage: donors ===")
-    source("scripts/stages/donors.R")
-}
-
-            rownames(souporcelldf) <- souporcelldf$barcode
-            obj <- AddMetaData(obj, metadata = souporcelldf)
-            obj <- subset(obj, assignment == "NA", invert = TRUE)
-
-            # split object into multiple objects based on assignment
-            if(argv$qc.split){
-                message("Splitting object into ", length(unique(souporcelldf$assignment))-1, " objects")
-                mini.obj.list <- SplitObject(obj, split = "assignment")
-                mini.obj.list <- lapply(mini.obj.list,
-                    function(mini.obj){
-                            mini.obj@project.name <- paste0("sample ", mini.obj$assignment[1])
-                            mini.obj$orig.ident <- paste0("control.skin.", mini.obj$assignment[1])
-                            return(mini.obj)})
-                return(mini.obj.list)
-            }
-
-            return(obj)
-        })
-    obj.list <- unlist(obj.list, recursive = FALSE)
 }
 
 if("callpeaks" %in% pipelines.to.run){
@@ -164,6 +121,13 @@ if("qc" %in% pipelines.to.run){
 if("filter" %in% pipelines.to.run){
     message("=== Stage: filter ===")
     source("scripts/stages/filter.R")
+}
+
+# after filter, before merge: per-sample objects still have plain Cell Ranger
+# barcodes as cell names, and merge carries the donor columns through
+if("donors" %in% pipelines.to.run){
+    message("=== Stage: donors ===")
+    source("scripts/stages/donors.R")
 }
 
 if("cluster" %in% pipelines.to.run){

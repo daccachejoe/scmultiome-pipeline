@@ -3,8 +3,8 @@
 # records a consensus call in the metadata. Cells are NOT removed here: the
 # filter step of stage 02 drops doublet.call == "doublet" cells, so doublets
 # stay visible in stage 01's QC clustering and plots for review.
-# Sourced by scripts/seurat_signac_pipeline.R, right after create and before
-# any souporcell split, since doublet rates are a property of the capture.
+# Sourced by scripts/seurat_signac_pipeline.R, right after create (and
+# ambient), per 10x capture, since doublet rates are a property of the capture.
 #
 # Evidence, per cell:
 #   RNA   scDblFinder on RNA counts (SoupX-corrected when the ambient stage
