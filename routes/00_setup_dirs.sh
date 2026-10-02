@@ -23,6 +23,14 @@ fi
 if [ ! -f configs/resolution_to_use.txt ]; then
     touch configs/resolution_to_use.txt
 fi
+# genotype demultiplexing inputs (optional stage 00b + stage 02 donors); header only,
+# so projects that don't pool donors are unaffected
+if [ ! -f configs/demultiplexing_paths.csv ]; then
+    echo "sampleName,demux_path,n_donors,min_rna_margin,gex_bam" > configs/demultiplexing_paths.csv
+fi
+if [ ! -f configs/donor_map.csv ]; then
+    echo "sampleName,cluster,donor" > configs/donor_map.csv
+fi
 # init the cluster labels file, with colnames
 if [ ! -f configs/cluster_labels.csv ]; then
     echo "sampleName,cluster,ct,ct.spec" > configs/cluster_labels.csv

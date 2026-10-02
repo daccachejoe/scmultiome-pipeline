@@ -1,6 +1,6 @@
 # Installation
 
-This pipeline uses **five separate conda environments** plus your HPC's
+This pipeline uses **five separate conda environments** (six with optional demultiplexing) plus your HPC's
 module system for R. They're kept separate because SCENIC+, UCDeconvolve,
 sceasy, and PyTorch pin conflicting dependency versions.
 
@@ -11,6 +11,7 @@ sceasy, and PyTorch pin conflicting dependency versions.
 | `UCD_env_name`                         | UCDeconvolve cell-type calling (stage 03)  |
 | `scenicplus_env_name`                  | SCENIC+ regulon inference (downstream branch, extra environments) |
 | `decoder_env_name`                     | Constrained decoder (downstream branch): PyTorch, scipy, statsmodels |
+| `demux_env_name`                       | Donor demultiplexing (optional stage 00b): pysam, numpy, scipy |
 
 Before starting, copy the config template and fill in your environment names
 and paths (see `config/pipeline.config.example` for every key):
@@ -134,3 +135,21 @@ uv lock   # produces a real uv.lock for this environment
 HOMER's `findMotifsGenome.pl` (see `decoder_homer_script` in
 `config/pipeline.config`) -- installed separately, module-loaded or on
 `$PATH`, not part of this conda env.
+
+## 6. Demultiplexing environment (`demux_env_name`, optional stage 00b)
+
+Only for projects that pool several donors per 10x library.
+
+```
+conda create -n demux-env -c conda-forge -c bioconda python=3.12.2 pysam=0.22.1 numpy=2.1.0 scipy=1.14.1
+```
+
+(or `pip install -e ".[demux]"` into a Python 3.12 env). The versions are
+pinned to the ones the ported scripts were checked against byte for byte.
+
+The stage also needs the **souporcell Singularity image** (`souporcell_sif`),
+which provides souporcell, samtools/bcftools 1.9 and vartrix 1.1.22, and a
+`singularity` module (`singularity_module`). The container only works when
+its inputs are copied inside its bind directory, so each library needs work
+space for a copy of its GEX BAM (up to ~20 GB) and the reference FASTA: set
+`demux_tmp_dir` to scratch.

@@ -33,6 +33,7 @@ corresponding `routes/*.sh` script.
 | # | `run/runmultiome` stage | What it does | Route | Key script(s) |
 |---|---|---|---|---|
 | 00 | `init` | Set up project directories, bootstrap `config/pipeline.config`, install R deps | `routes/00_setup_dirs.sh`, `routes/00_install.sh` | -- |
+| 00b | `demultiplex` | **Optional, donor-pooled libraries only.** Per library: souporcell, then pooled-genotype rescue of cells souporcell left unassigned; then cross-library genotype matching. Run before 01 (see [Donor demultiplexing](#donor-demultiplexing)) | `routes/00b_demultiplex.sh` | `scripts/demultiplex/*` |
 | 01 | `seurat_preprocess` | Per-sample: create Seurat objects, QC metrics, ambient RNA correction (SoupX) + ambient ATAC estimate, RNA + ATAC doublet calling, MACS peak calling, QC plots | `routes/01_seurat_preprocess.sh` | `scripts/seurat_signac_pipeline.R` |
 | 02 | `run_merged_pipeline` | Remove doublets, filter samples per `configs/qc_df.csv`, merge into one object with a consensus peak set + clustering | `routes/02_merge_pipeline.sh` | `scripts/seurat_signac_pipeline.R` |
 | 03 | `identify_celltypes` | UCDeconvolve-assisted cell type calling (human then fills in `configs/cluster_labels.csv`) | `routes/03_identify_celltypes.sh` | `scripts/03_convert_seurat_to_h5ad.R`, `scripts/03_ucd_deconvolve.py`, `scripts/03_plot_ucd_results.R` |
@@ -162,6 +163,7 @@ shorter, hand-chosen directory name instead of the auto-generated one.
 ├── routes/                        # trunk stages, numbered 00-06 (strict order)
 │   ├── 00_setup_dirs.sh
 │   ├── 00_install.sh
+│   ├── 00b_demultiplex.sh         # optional, before 01: donor demultiplexing of pooled libraries
 │   ├── 01_seurat_preprocess.sh
 │   ├── 02_merge_pipeline.sh
 │   ├── 03_identify_celltypes.sh
@@ -180,17 +182,20 @@ shorter, hand-chosen directory name instead of the auto-generated one.
 │   ├── 04_label_celltypes.R
 │   ├── 06a_linkpeaks_split.R, 06b_linkpeaks_group.R, 06c_linkpeaks_merge.R
 │   ├── stages/                    # one file per pipeline stage, sourced by the engine
+│   ├── demultiplex/               # stage 00b: souporcell.sh, rescue.sh, 01-06 steps
 │   ├── downstream/                # subcluster helper, SCENIC+, and decoder scripts
 │   │   └── decoder/                # pseudobulk -> features -> CV decoder -> peak projection
 │   │                               #   -> stable peaks -> motif enrichment (see README's
 │   │                               #   "Decoder methodology & caveats")
-│   └── lib/                       # shared R helpers (config.R, genome.R, seurat_io.R)
+│   └── lib/                       # shared R helpers (config.R, genome.R, seurat_io.R, demux.R)
 ├── config/                        # pipeline MACHINERY config -- edit once
 │   ├── pipeline.config.example    # tracked template
 │   └── pipeline.config            # your values (git-ignored)
 ├── configs/                       # per-project RUN INPUTS -- edit per project
 │   ├── samplesheet.csv
 │   ├── qc_df.csv
+│   ├── demultiplexing_paths.csv   # donor-pooled libraries (stage 00b)
+│   ├── donor_map.csv              # (sample, souporcell cluster) -> patient ID (stage 02 donors)
 │   ├── cluster_labels.csv
 │   ├── resolution_to_use.txt
 │   ├── scenicplus-*-config.yml
@@ -317,6 +322,64 @@ reviewed. Before running stage 02, check:
 
 Set `remove_doublets=false` in `config/pipeline.config` to keep doublets
 through stage 02. The calls stay in the metadata either way.
+
+### Donor demultiplexing
+
+For 10x libraries that pool several people, stage 00b assigns every cell to a
+person and stage 02 writes it into the object. Single-donor projects skip
+00b and only need `configs/donor_map.csv` rows with cluster `*` if they want
+a `donor` column.
+
+**Inputs.** `configs/demultiplexing_paths.csv`, one row per pooled library:
+
+| sampleName | demux_path | n_donors | min_rna_margin | gex_bam |
+| --- | --- | --- | --- | --- |
+| PSO_Lesional | | 2 | | |
+| cntrl.2 | /path/to/existing/souporcell/clusters.tsv | 2 | 20 | none |
+
+A blank `demux_path` runs souporcell here. A path reuses an existing
+souporcell run. `gex_bam` defaults to the Cell Ranger GEX BAM; `none`, or no
+BAM, runs an ATAC-only rescue. `min_rna_margin` restricts the calibration
+truth to confident souporcell calls (used when ATAC is deep and RNA shallow).
+
+**`run/runmultiome demultiplex`** submits, per library:
+1. **souporcell** on the GEX BAM (`-k n_donors`, no reference VCF). souporcell
+   on the ATAC BAM gave clusters unrelated to donors, so ATAC isn't used here.
+2. **Pooled-genotype rescue.** souporcell leaves low-RNA nuclei unassigned
+   (13–38% of barcodes in prelim-long-data), though they pass QC. The rescue
+   pools each donor's singlet reads (ATAC + GEX), keeps SNPs whose pooled
+   allele fractions differ between donors ("soft" genotypes: ~30k SNPs vs ~2k
+   for hard calls), counts each cell's alleles (ATAC once per fragment), and
+   calls every cell with a likelihood model (10% ambient, 5% doublet prior,
+   posterior ≥ 0.95). The ATAC weight is fit on held-out fold-B singlets
+   against souporcell, because raw ATAC posteriors were overconfident. Held
+   out, 80–94% of singlets were called at 98.2–99.9% accuracy.
+3. **Combined calls** (`output/demultiplex/<sample>/combined_clusters.tsv`):
+   souporcell singlet > doublet (either method) > pooled rescue > unassigned.
+   A donor whose held-out precision is below `demux_min_donor_precision`
+   (0.98) gets no rescue calls. Its pooled genotype is too thin to recognize,
+   and its cells get called as another donor.
+
+Then **genotype matching** across libraries correlates souporcell cluster
+genotypes (same person r ≈ 0.88–0.92, different ≈ 0.3–0.56) and writes
+`output/demultiplex/donor-map-suggested.csv` with placeholder IDs. Copy it to
+`configs/donor_map.csv` (`sampleName,cluster,donor`) and replace the
+placeholders with patient IDs. Libraries whose souporcell run kept no
+`cluster_genotypes.vcf` can't be matched and get their own IDs.
+
+**Downstream.** Stage 01 `doublets` counts the combined calls' doublets
+(souporcell and pooled) as genotype doublets. Stage 02 runs a `donors` step
+between `filter` and `merge` whenever either config has rows, adding
+`donor`, `donor.source` (souporcell | pooled_rescue | pooled | single-donor
+library | none) and `souporcell.status`. It stops if a pooled cluster or a
+single-donor sample has no `donor_map.csv` row. Counts per donor:
+`output/tables/{prefix}-02-donor-counts.csv`.
+
+Per-run overrides: `DEMUX_STEPS=souporcell,rescue,match`,
+`DEMUX_SAMPLES=a,b`, `DEMUX_CORES=16`, `DEMUX_FORCE=1` (rerun libraries that
+already have outputs). Resources per library (16 cores × 4 GB): souporcell
+0.4–1.2 h, rescue 0.5–0.9 h. Needs the `demux_env_name` environment and the
+souporcell container (`souporcell_sif`); see `docs/INSTALLATION.md`.
 
 ## Scheduler support
 

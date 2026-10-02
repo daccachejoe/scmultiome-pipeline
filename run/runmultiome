@@ -10,6 +10,8 @@ Usage: run/runmultiome <stage>
 
 Trunk stages (run in this strict order):
   init                  00 - set up project directories and install R deps
+  demultiplex           00b - (optional, donor-pooled libraries only) souporcell + pooled-genotype
+                          rescue per library, then cross-library genotype matching; run before 01
   seurat_preprocess     01 - per-sample Seurat/Signac QC + peak calling
   run_merged_pipeline   02 - filter + merge samples into one object
   identify_celltypes    03 - UCDeconvolve-assisted cell type calling
@@ -116,6 +118,11 @@ init() {
     set +a
     bash routes/00_setup_dirs.sh
     bash routes/00_install.sh
+}
+
+demultiplex() {
+    echo "Step 00b: genotype demultiplexing (orchestrator; submits per-library jobs)"
+    submit_job routes/00b_demultiplex.sh scripts/outs/00b-demultiplex-%J.out 1:00 2000 1
 }
 
 seurat_preprocess() {

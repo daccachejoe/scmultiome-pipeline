@@ -69,6 +69,23 @@ adaptive_peak_cutoff_max=200
 adaptive_peak_cutoff_fraction=0.25
 adaptive_peak_cutoff_floor=50
 
+# ---- Genotype demultiplexing (optional stage 00b, run/runmultiome demultiplex) ----
+# souporcell container (also provides samtools, bcftools and vartrix)
+souporcell_sif=/path/to/singularity-pkgs/souporcell_release.sif
+singularity_module=singularity
+# conda env with pysam, numpy, scipy (pyproject.toml extra "demux")
+demux_env_name=demux-env
+# where per-library work dirs go: the container needs copies of the GEX BAM
+# (up to ~20 GB) and the reference. Blank = output/demultiplex/. Scratch is better.
+demux_tmp_dir=
+# a cell's pooled-genotype call needs this posterior
+demux_min_posterior=0.95
+# ambient fraction mixed into every donor model, and the doublet prior
+demux_ambient=0.10
+demux_doublet_prior=0.05
+# donors whose held-out precision is below this get no rescue calls (thin-donor guard)
+demux_min_donor_precision=0.98
+
 # ---- API tokens (keep these here, never in tracked scripts) ----
 # UCDeconvolve API token, read by scripts/03_ucd_deconvolve.py (stage 03)
 ucd_api_token=
