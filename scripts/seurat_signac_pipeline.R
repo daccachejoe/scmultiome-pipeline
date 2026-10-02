@@ -12,7 +12,7 @@ p <- arg_parser("Run single-cell RNA + ATAC Multiomic Analysis from 10X Genomics
 
 # Add required command line arguments
 p <- add_argument(p, "pipeline",
-                help="Comma delimted combinations of: init, create, ambient, doublets, callpeaks, qc, filter, cluster, subcluster, merge, linkpeaks, footprint",
+                help="Comma delimted combinations of: init, create, ambient, doublets, callpeaks, qc, filter, donors, cluster, subcluster, merge, linkpeaks, footprint",
                 type="character")
 p <- add_argument(p, "samplesheet", help="samplesheet in csv format", type="character")
 
@@ -123,6 +123,13 @@ if(!(argv$SoupOrCellDF == "NA")){
             cells.not.in.SoC <- colnames(obj)[!(colnames(obj) %in% souporcelldf$barcode)]
             residual.df <- data.frame(barcode = cells.not.in.SoC, assignment = "NA")
             souporcelldf <- rbind(souporcelldf, residual.df)
+# after filter, before merge: per-sample objects still have plain Cell Ranger
+# barcodes as cell names, and merge carries the donor columns through
+if("donors" %in% pipelines.to.run){
+    message("=== Stage: donors ===")
+    source("scripts/stages/donors.R")
+}
+
             rownames(souporcelldf) <- souporcelldf$barcode
             obj <- AddMetaData(obj, metadata = souporcelldf)
             obj <- subset(obj, assignment == "NA", invert = TRUE)

@@ -30,9 +30,12 @@
 #         considered and rejected: most ATAC calls rest on one of them
 #         (e.g. 5376-AB-2: 147 score-driven, 253 AMULET-driven of 415), which
 #         is the complementarity the combination is for.
-#   Genotype  souporcell status == "doublet", for samples listed in
-#         configs/demultiplexing_paths.csv (sampleName,demux_path ->
-#         clusters.tsv). Only doublets between donors are detectable this way.
+#   Genotype  status == "doublet" in the sample's genotype calls, for samples
+#         listed in configs/demultiplexing_paths.csv: the demultiplex
+#         branch's combined_clusters.tsv (souporcell + pooled-genotype
+#         doublets), else demux_path (a souporcell clusters.tsv); see
+#         scripts/lib/demux.R. Only doublets between donors are detectable
+#         this way. Labelled "souporcell" below for continuity.
 #
 # doublet.call = "doublet" if souporcell calls it, or if BOTH the RNA and
 # ATAC evidence agree. A single modality alone is not enough: requiring
@@ -71,9 +74,9 @@ if (is.na(amulet.min.informative) || amulet.min.informative < 0 || amulet.min.in
          Sys.getenv("doublet_amulet_min_informative"))
 }
 
-# souporcell calls, if any samples were genotype-demultiplexed
-demux.file <- "configs/demultiplexing_paths.csv"
-demux.paths <- if (file.exists(demux.file)) read.csv(demux.file, stringsAsFactors = FALSE) else NULL
+# genotype calls, if any samples were genotype-demultiplexed
+source("scripts/lib/demux.R")
+demux.paths <- ReadDemuxSheet()
 
 # AMULET: exclude mito/sex chromosomes (as recommended) plus the genome's
 # blacklist; both UCSC and NCBI names are listed since fragment files vary
@@ -117,9 +120,9 @@ obj.list <- lapply(obj.list, function(seu) {
     rna.dbr <- NULL  # scDblFinder's default expected rate unless souporcell ran
     has.souporcell <- !is.null(demux.paths) && sample.name %in% demux.paths$sampleName
     if (has.souporcell) {
-        soc <- read.delim(demux.paths$demux_path[demux.paths$sampleName == sample.name][1])
+        soc <- ReadDemuxCalls(sample.name, demux.paths)
         matched <- mean(colnames(seu) %in% soc$barcode)
-        message("  souporcell: ", round(100 * matched, 1), "% of barcodes matched, ",
+        message("  genotype calls (", attr(soc, "path"), "): ", round(100 * matched, 1), "% of barcodes matched, ",
                 sum(soc$status == "doublet"), " genotype doublets called")
         if (matched < 0.5) {
             warning("Fewer than half of ", sample.name, "'s barcodes are in its souporcell clusters.tsv -- ",

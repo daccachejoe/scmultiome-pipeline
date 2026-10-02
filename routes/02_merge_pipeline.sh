@@ -12,9 +12,19 @@ fi
 # INPUT_RDS=output/RDS-files/my-variant-01-qc-obj-list.RDS run/runmultiome run_merged_pipeline
 INPUT_RDS="${INPUT_RDS:-output/RDS-files/$project_prefix-01-qc-obj-list.RDS}"
 
-echo Running merged pipeline
+# donors (patient IDs from the demultiplex branch + configs/donor_map.csv) runs
+# whenever either config has data rows (init creates both with only a header),
+# so a pooled project can't produce a merged object without donors
+STAGES=filter,merge
+for f in configs/demultiplexing_paths.csv configs/donor_map.csv; do
+    if [ -f "$f" ] && [ "$(tail -n +2 "$f" | grep -c '[^[:space:]]')" -gt 0 ]; then
+        STAGES=filter,donors,merge
+    fi
+done
+
+echo "Running merged pipeline: $STAGES"
 scripts/seurat_signac_pipeline.R \
-        filter,merge \
+        $STAGES \
         configs/samplesheet.csv \
         --qc.sheet configs/qc_df.csv \
         --project_prefix $project_prefix \
