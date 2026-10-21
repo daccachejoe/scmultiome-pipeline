@@ -7,7 +7,10 @@ if [ -s "configs/resolution_to_use.txt" ]; then
 
     # override to point this stage at a different input, e.g.:
     # INPUT_RDS=output/RDS-files/my-variant-02-merge-obj-list.RDS run/runmultiome identify_celltypes
-    INPUT_RDS="${INPUT_RDS:-output/RDS-files/$project_prefix-02-merge-obj-list.RDS}"
+    # (single-sample projects: stage 02 writes -02-cluster instead of -02-merge)
+    DEFAULT_RDS=output/RDS-files/$project_prefix-02-merge-obj-list.RDS
+    [ -f "$DEFAULT_RDS" ] || DEFAULT_RDS=output/RDS-files/$project_prefix-02-cluster-obj-list.RDS
+    INPUT_RDS="${INPUT_RDS:-$DEFAULT_RDS}"
 
     source $personal_anaconda_path
     conda activate $sceasy_env_name

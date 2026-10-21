@@ -1,12 +1,18 @@
 # Stage: cluster
 # Runs PreprocessAndReduceDims + ConstructWNNGraph per object, writes
 # per-object cluster resolution plots and marker gene tables.
+# Route 02 uses it instead of merge for single-sample projects.
 # Sourced by scripts/seurat_signac_pipeline.R.
 
 library(clustree, quietly=TRUE)
 message("Running Clustering Pipeline.")
 obj.list <- lapply(obj.list, function(obj){
-    obj@project.name <- obj$cell.lineage[1]
+    # lineage objects are named by lineage, single samples by sample
+    if("cell.lineage" %in% colnames(obj@meta.data)){
+        obj@project.name <- obj$cell.lineage[1]
+    } else {
+        obj@project.name <- obj$orig.ident[1]
+    }
     return(obj)
 })
 
@@ -21,7 +27,7 @@ obj.list <-
                                     resolution = seq(0,1,0.1))
             return(obj)
         })
-saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-cluster-obj-list.RDS"))
+saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-02-cluster-obj-list.RDS"))
 
 # plots to help decide resolution to use
 lapply(obj.list, function(obj){
@@ -56,20 +62,18 @@ lapply(obj.list, function(obj){
 # calculate marker genes at each resolution
 lapply(obj.list,
     function(obj){
+        obj <- PrepSCTFindMarkers(obj)
         M.list <-
         lapply(seq(0.1, 1, 0.1), function(res){
             Idents(obj) <- paste0("wsnn_res.", res)
-            obj <- PrepSCTFindMarkers(obj)
             M <- FindAllMarkers(obj,
                                 only.pos = TRUE,
                                 min.pct = 0.25,
                                 logfc.threshold = 0.25)
-            M <- M %>% mutate(resolution = res)
-            write.csv(M, file = paste0("output/tables/cluster-markers-res.", res, ".csv"))
+            M <- M %>% mutate(resolution = res) %>% arrange(cluster, p_val_adj)
+            write.csv(M, file = paste0("output/tables/", argv$project_prefix, "-", obj@project.name, "-02-cluster-markers-res.", res, ".csv"))
             return(M)
         })
         M <- bind_rows(M.list)
-        write.csv(M, file = paste0("output/tables/cluster-markers-bound.csv"))
+        write.csv(M, file = paste0("output/tables/", argv$project_prefix, "-", obj@project.name, "-02-cluster-markers-bound.csv"))
     })
-
-saveRDS(obj.list, file = paste0("output/RDS-files/", argv$project_prefix,"-cluster-obj-list.RDS"))
