@@ -69,7 +69,10 @@ obj.list <- lapply(names(frag.paths),function(f.path.name){
 })
 
 # merge the objects now with a combined peaks set
-if(length(obj.list) == 2){
+# (a single sample has nothing to merge: c(2:1) would merge it with itself)
+if(length(obj.list) == 1){
+    merged.obj <- obj.list[[1]]
+} else if(length(obj.list) == 2){
     merged.obj <- merge(obj.list[[1]], obj.list[[2]])
 } else {
     merged.obj <- merge(obj.list[[1]], obj.list[c(2:length(obj.list))])
@@ -91,6 +94,11 @@ residual.features.to.use <- Reduce(intersect, lapply(obj.list, function(obj){ret
 residual.peaks.to.use <- NULL
 
 # rerun the clustering on the merged object
+# Harmony needs at least two batches; a single sample runs on pca/lsi
+if(argv$RunHarmony && length(unique(merged.obj$orig.ident)) < 2){
+    message("Only one sample (orig.ident): skipping Harmony")
+    argv$RunHarmony <- FALSE
+}
 if(argv$RunHarmony){
     message("RunHarmony flagged as TRUE")
     my.harmony.vars <- "orig.ident"
