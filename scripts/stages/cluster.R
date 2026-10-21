@@ -62,11 +62,14 @@ lapply(obj.list, function(obj){
 # calculate marker genes at each resolution
 lapply(obj.list,
     function(obj){
+        # gene markers: after the ATAC reduction the default assay is peaks
+        DefaultAssay(obj) <- "SCT"
         obj <- PrepSCTFindMarkers(obj)
         M.list <-
         lapply(seq(0.1, 1, 0.1), function(res){
             Idents(obj) <- paste0("wsnn_res.", res)
             M <- FindAllMarkers(obj,
+                                assay = "SCT",
                                 only.pos = TRUE,
                                 min.pct = 0.25,
                                 logfc.threshold = 0.25)

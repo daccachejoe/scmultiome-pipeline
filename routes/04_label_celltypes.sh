@@ -14,7 +14,10 @@ if [[ $(wc -l < "configs/cluster_labels.csv") -gt 1 ]]; then
 
     # override to point this stage at a different input, e.g.:
     # INPUT_RDS=output/RDS-files/my-variant-02-merge-obj-list.RDS run/runmultiome label_celltypes
-    INPUT_RDS="${INPUT_RDS:-output/RDS-files/$project_prefix-02-merge-obj-list.RDS}"
+    # (single-sample projects: stage 02 writes -02-cluster instead of -02-merge)
+    DEFAULT_RDS=output/RDS-files/$project_prefix-02-merge-obj-list.RDS
+    [ -f "$DEFAULT_RDS" ] || DEFAULT_RDS=output/RDS-files/$project_prefix-02-cluster-obj-list.RDS
+    INPUT_RDS="${INPUT_RDS:-$DEFAULT_RDS}"
 
     Rscript scripts/04_label_celltypes.R \
         configs/cluster_labels.csv \
