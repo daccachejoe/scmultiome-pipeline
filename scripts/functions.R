@@ -124,11 +124,15 @@ PreprocessAndReduceDims <- function(seu, harmony=FALSE,
     seu <- SCTransform(seu, verbose = FALSE, residual.features = residual.features,
        vars.to.regress = vars.to.regress) %>% RunPCA(npc = rna.pcs, verbose = FALSE) 
     
+    # harmony needs one theta per variable: recycle a scalar, pass per-variable vectors through as-is
+    if(length(rna.theta) == 1) rna.theta <- rep(rna.theta, length(harmony.vars))
+    if(length(atac.theta) == 1) atac.theta <- rep(atac.theta, length(harmony.vars))
+
     dims.to.use <- 1:rna.pcs
     if(harmony){
       require(harmony)
       message("Running harmony integration on RNA: ", harmony.vars)
-      seu <- RunHarmony(seu, group.by.vars = harmony.vars, reduction = "pca", assay.use = "SCT", dims.use = 1:rna.pcs, reduction.save = "rna.harmony", project.dim = FALSE, theta = rep(rna.theta, length(harmony.vars)), max_iter = 25)
+      seu <- RunHarmony(seu, group.by.vars = harmony.vars, reduction = "pca", assay.use = "SCT", dims.use = 1:rna.pcs, reduction.save = "rna.harmony", project.dim = FALSE, theta = rna.theta, max_iter = 25)
       dims.to.use <- 1:rna.pcs
     }
     reduction.to.use <- ifelse(harmony, "rna.harmony", "pca")
@@ -146,11 +150,11 @@ PreprocessAndReduceDims <- function(seu, harmony=FALSE,
     seu <- FindTopFeatures(seu, min.cutoff = 'q50', verbose = FALSE)
     seu <- RunSVD(seu, n = atac.pcs, features = residual.peaks, verbose = FALSE)
 
-    dims.to.use <- 1:atac.pcs
+    dims.to.use <- 2:atac.pcs
     if(harmony){
     message("Running harmony integration on ATAC: ", harmony.vars)
     # seu <- ScaleData(seu, assay = "ATAC")
-    seu <- RunHarmony(seu, group.by.vars = harmony.vars, reduction = "lsi",assay.use = "peaks", dims.use = 2:atac.pcs, reduction.save = "atac.harmony", project.dim = FALSE, theta = rep(atac.theta, length(harmony.vars)), max_iter = 25)
+    seu <- RunHarmony(seu, group.by.vars = harmony.vars, reduction = "lsi",assay.use = "peaks", dims.use = 2:atac.pcs, reduction.save = "atac.harmony", project.dim = FALSE, theta = atac.theta, max_iter = 25)
     dims.to.use <- 1:(atac.pcs - 1)
     }
     reduction.to.use <- ifelse(harmony, "atac.harmony", "lsi")
