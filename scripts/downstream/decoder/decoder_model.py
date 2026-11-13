@@ -121,9 +121,20 @@ def forward(X: torch.Tensor, C: torch.Tensor, W: torch.Tensor,
     Returns logits: (n_samples, n_conditions)
     """
     n_cond = C.shape[0]
+    # This one line is the entire "constrained" part of the model: instead
+    # of learning a separate weight vector per condition (n_conditions x
+    # n_features free parameters), every condition's weight vector is
+    # forced to be C's row for that condition times the shared W -- so two
+    # conditions that share a component (e.g. both have beta_dis = 1) are
+    # mechanically forced to share that component's contribution, not just
+    # correlated after the fact.
     condition_weights = C @ W                       # (n_conditions, n_features)
     logits = X @ condition_weights.T                # (n_samples, n_conditions)
 
+    # Same reference-stays-at-zero scatter as fit_decoder()'s post-processing
+    # -- done here too since forward() is also called directly during CV
+    # evaluation (see 03_train_cv.py's evaluate_fold), not just at the end
+    # of a fit.
     device = X.device
     full_intercepts = torch.zeros(n_cond, dtype=X.dtype, device=device)
     nonref_positions = [i for i in range(n_cond) if i != reference_idx]
@@ -219,6 +230,11 @@ def fit_decoder(X: torch.Tensor, y_idx: torch.Tensor, C: torch.Tensor,
         else torch.zeros(n_cond - 1, dtype=X.dtype)
     )
 
+    # max_iter here is LBFGS's OWN internal iteration budget for a single
+    # optimizer.step() call, not an epoch count -- unlike SGD/Adam, LBFGS
+    # is designed to run many internal iterations (each with its own line
+    # search) inside one .step(), so a single call below is the entire fit,
+    # not one step of a training loop.
     optimizer = torch.optim.LBFGS(
         [W, intercepts_nonref], max_iter=max_iter, tolerance_grad=tol, tolerance_change=tol,
         line_search_fn="strong_wolfe",
@@ -226,22 +242,33 @@ def fit_decoder(X: torch.Tensor, y_idx: torch.Tensor, C: torch.Tensor,
 
     loss_history = []
 
+    # LBFGS calls this closure itself, repeatedly, during optimizer.step()
+    # -- once per trial point its line search evaluates, not once per
+    # "iteration" in the usual sense. It has to recompute the forward pass
+    # and gradient from scratch each call (rather than being handed a
+    # precomputed gradient like SGD/Adam expect), which is why the whole
+    # loss computation lives inside this nested function instead of outside it.
     def closure():
         optimizer.zero_grad()
         logits = forward(X, C, W, intercepts_nonref, reference_idx)
         ce = weighted_masked_cross_entropy(logits, y_idx, sample_weights, mask)
-        reg = l2_lambda * (W ** 2).sum()
+        reg = l2_lambda * (W ** 2).sum()  # L2 on W only -- intercepts and C itself are never regularized
         loss = ce + reg
         loss.backward()
         loss_history.append(loss.item())
         return loss
 
-    optimizer.step(closure)
-    final_loss = closure().item()
+    optimizer.step(closure)          # runs the entire fit (up to max_iter internal iterations)
+    final_loss = closure().item()    # one more eval at the converged point, purely to report a clean final number
 
     if verbose:
         print(f"    LBFGS: {len(loss_history)} closure evals, final loss = {final_loss:.6f}")
 
+    # Scatter the (n_cond - 1) fitted intercepts back into their condition
+    # positions, leaving the reference condition's slot at its initialized
+    # 0 -- this is what "intercepts are fixed at 0 for the reference class"
+    # actually means mechanically: reference_idx is simply never assigned
+    # into full_intercepts, so it stays whatever torch.zeros gave it.
     full_intercepts = torch.zeros(n_cond, dtype=X.dtype)
     nonref_positions = [i for i in range(n_cond) if i != reference_idx]
     full_intercepts[nonref_positions] = intercepts_nonref.detach()

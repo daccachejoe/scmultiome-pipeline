@@ -139,6 +139,11 @@ def evaluate_fold(X_val, y_val, C, W, intercepts_full, reference_idx):
     """Unweighted CE + accuracy on a held-out fold. Held-out folds may contain
     only one condition (donors are nested 1:1 within condition in this design),
     so equal-condition-weighting isn't meaningful here -- a plain mean is used."""
+    # forward() takes the (n_cond - 1)-length "nonref" intercept form, not
+    # the full-length one fit_decoder() returns -- so this slices
+    # reference_idx back out of intercepts_full before handing it back in.
+    # It's the inverse of fit_decoder()'s own full_intercepts[nonref_positions]
+    # = intercepts_nonref scatter.
     logits = dec.forward(X_val, C, W,
                           intercepts_nonref=torch.cat([
                               intercepts_full[:reference_idx], intercepts_full[reference_idx + 1:]
@@ -167,6 +172,11 @@ def main():
     print(f"  L2 grid ({len(l2_grid)} values): {l2_grid}")
 
     # -- Phase A: grid search (fold-wise preprocessing -- see module docstring) --
+    # Nested loop: for every lambda, refit from scratch on every fold's
+    # training split. This is O(len(l2_grid) * n_folds) decoder fits (e.g.
+    # 11 lambdas x 8 donors = 88 fits) -- each one is cheap (small
+    # LBFGS problem), but it's why this phase dominates the branch's
+    # runtime, not steps 4-6 which are just linear algebra / a t-test.
     print("\n[Phase A] Grid search over L2 lambda x leave-one-fold-out CV...")
     grid_rows = []
     for lam in l2_grid:
@@ -213,6 +223,11 @@ def main():
         json.dump({"best_lambda": best_lambda, "selection_criterion": "min mean held-out CE across folds"}, f, indent=2)
 
     # -- Phase B: per-fold refit at best_lambda (fold-wise preprocessing again) --
+    # This is NOT redundant with Phase A: Phase A's fits were at every
+    # lambda in the grid (thrown away except for their held-out CE), and
+    # this phase refits ONLY at the one chosen best_lambda. The output here
+    # -- one W matrix per fold -- is what 05_identify_stable_peaks.py's
+    # across-fold t-test actually consumes; Phase A never saves its W's.
     print(f"\n[Phase B] Refitting each leave-one-{args.fold_col}-out fold at lambda={best_lambda:g}...")
     fold_W_rows = []
     for fold in unique_folds:
@@ -228,6 +243,9 @@ def main():
             condition_names=condition_names, verbose=False,
         )
         W = result["W"].numpy()
+        # Long (tidy) format rather than one CSV per fold or a 3D array --
+        # keeps 04_project_to_peak_space.py's groupby(["held_out_fold",
+        # "component"]) simple and keeps this file readable in a text editor.
         for ci, comp in enumerate(component_names):
             for fi, feat in enumerate(feature_names):
                 fold_W_rows.append({"held_out_fold": fold, "component": comp, "feature": feat, "weight": W[ci, fi]})

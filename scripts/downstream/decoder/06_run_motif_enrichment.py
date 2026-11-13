@@ -84,6 +84,13 @@ def build_background_bed(peaks_used_path: str, regex: str, out_path: str):
 
 
 def run_homer(foreground_bed, genome, out_dir, background_bed, size, n_threads, homer_script, dry_run):
+    # -bg background_bed is the whole point of this script over a plain
+    # HOMER call against the genome default background: it asks "which
+    # motifs are enriched in these stable peaks vs. other peaks we could
+    # plausibly have called stable", not "vs. random genomic sequence" --
+    # the latter would just recover generic open-chromatin motifs. See the
+    # module docstring for why the background is atac_peaks_used.csv, not
+    # the whole genome.
     cmd = [homer_script, foreground_bed, genome, out_dir, "-bg", background_bed, "-size", str(size), "-p", str(n_threads)]
     print(f"  Command: {' '.join(cmd)}")
     if dry_run:

@@ -60,6 +60,20 @@ stopifnot(identical(colnames(atac_counts), sample_meta$sample_id))
 stopifnot(identical(colnames(rna_counts), sample_meta$sample_id))
 
 message("[2/5] Filtering ATAC peaks (distal + prevalence)...")
+# Two independent filters, ANDed together:
+#   distal_pass      -- peak is far enough from any TSS that its
+#                        accessibility reflects a distal regulatory
+#                        element (enhancer-like), not promoter activity.
+#   prevalence_pass   -- peak is detected in a large-enough fraction of
+#                        cells in at least one cell type (step 1's union
+#                        rule across cell types, not intersection --
+#                        keeps cell-type-restricted peaks that would look
+#                        like noise if every cell type had to clear the
+#                        threshold independently).
+# Distal filtering happens before LSI (not after) because LSI's TF-IDF
+# step is sensitive to which peaks are in the matrix -- fitting LSI on
+# promoter-proximal peaks and then discarding them afterward would still
+# let promoter/depth signal shape the component directions.
 if (!argv$tss_distance_col %in% colnames(peak_meta)) {
   stop("Column '", argv$tss_distance_col, "' not found in atac_peak_metadata.csv. ",
        "Available: ", paste(colnames(peak_meta), collapse = ", "))
@@ -98,29 +112,52 @@ write.csv(peaks_used_log, file.path(argv$out_dir, "atac_peaks_used.csv"), row.na
 atac_distal <- Matrix::Matrix(atac_counts[keep_peaks, , drop = FALSE], sparse = TRUE)
 
 message("[3/5] Running TF-IDF + SVD (LSI) on distal peaks...")
+# RunTFIDF + RunSVD is the standard Signac LSI recipe -- TF-IDF normalizes
+# each pseudobulk "sample" (here: cell type x donor pool) by its total
+# accessible-peak signal, then SVD finds the components. LSI dim 1 is
+# dropped by default (--keep_lsi_dim1 to retain it) because it's
+# conventionally dominated by sequencing depth/read-count differences
+# between samples rather than biology -- standard ArchR/Signac practice,
+# not specific to this decoder.
 tfidf_mat <- RunTFIDF(atac_distal, verbose = FALSE)
 lsi <- RunSVD(tfidf_mat,
               n = min(argv$n_lsi_components, ncol(atac_distal) - 1, nrow(atac_distal) - 1),
               reduction.key = "LSI_", verbose = FALSE)
-lsi_embeddings <- Embeddings(lsi)
-lsi_loadings   <- Loadings(lsi)
+lsi_embeddings <- Embeddings(lsi)   # samples x components -- the decoder's ATAC feature matrix
+lsi_loadings   <- Loadings(lsi)     # peaks x components -- how step 6 projects W back to peak space
 if (drop_dim1) {
   lsi_embeddings <- lsi_embeddings[, -1, drop = FALSE]
   lsi_loadings   <- lsi_loadings[, -1, drop = FALSE]
 }
+# Re-order to match sample_metadata.csv's row order for a clean CSV diff /
+# readability -- 03_train_cv.py re-aligns by the sample_id row label
+# itself (pandas .loc[]), not by position, so this ordering isn't load-
+# bearing downstream, just consistent.
 lsi_embeddings <- lsi_embeddings[sample_meta$sample_id, , drop = FALSE]
 message("  Final LSI feature set: ", ncol(lsi_embeddings), " components (dim1 dropped: ", drop_dim1, ")")
 write.csv(lsi_embeddings, file.path(argv$out_dir, "atac_lsi_embeddings.csv"))
 write.csv(lsi_loadings, file.path(argv$out_dir, "atac_lsi_loadings.csv"))
 
 message("[4/5] Normalizing RNA (DESeq2 median-of-ratios) + PCA...")
+# DESeq2's classic median-of-ratios size factor: for each sample, the
+# median (across genes) of that sample's count divided by each gene's
+# geometric mean count across all samples. This corrects for pseudobulk
+# library-size differences the same way it would for ordinary bulk
+# RNA-seq -- appropriate here because rna_counts is genes x pseudobulk
+# samples (donor x cell type pools), not genes x single cells, so Seurat's
+# per-cell NormalizeData()/SCTransform() machinery doesn't apply.
 size_factors <- estimateSizeFactorsForMatrix(rna_counts)
 rna_norm <- sweep(rna_counts, 2, size_factors, FUN = "/")
 rna_log  <- log1p(rna_norm)
 n_pcs <- min(argv$n_pca_components, ncol(rna_log) - 1, nrow(rna_log) - 1)
+# center = TRUE, scale. = FALSE: center each gene (remove its across-sample
+# mean) but don't unit-variance-scale it -- so highly variable genes still
+# dominate the components, matching the methodology's PCA-on-pseudobulk-
+# profiles description; per-component z-scoring happens later anyway, in
+# 03_train_cv.py's fold-wise standardization.
 pca <- prcomp(t(rna_log), center = TRUE, scale. = FALSE, rank. = n_pcs)
-pca_embeddings <- pca$x[sample_meta$sample_id, , drop = FALSE]
-pca_loadings   <- pca$rotation
+pca_embeddings <- pca$x[sample_meta$sample_id, , drop = FALSE]  # samples x PCs
+pca_loadings   <- pca$rotation                                   # genes x PCs
 message("  Final PCA feature set: ", ncol(pca_embeddings), " components")
 write.csv(pca_embeddings, file.path(argv$out_dir, "rna_pca_embeddings.csv"))
 write.csv(pca_loadings, file.path(argv$out_dir, "rna_pca_loadings.csv"))

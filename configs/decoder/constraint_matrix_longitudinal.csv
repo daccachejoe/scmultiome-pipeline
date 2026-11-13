@@ -1,0 +1,10 @@
+condition,beta_sub,beta_dis,beta_loc_mu,beta_loc_t,beta_int_mu,beta_int_t
+HC,0,0,0,0,0,0
+AD_NL,1,0,0,0,0,0
+PSO_NL,1,1,0,0,0,0
+AD_L_T1,1,0,1,-1,0,0
+AD_L_T2,1,0,1,0,0,0
+AD_L_T3,1,0,1,1,0,0
+PSO_L_T1,1,1,1,-1,1,-1
+PSO_L_T2,1,1,1,0,1,0
+PSO_L_T3,1,1,1,1,1,1

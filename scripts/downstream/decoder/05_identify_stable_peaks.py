@@ -1,14 +1,34 @@
 #!/usr/bin/env python3
 """
-Decoder branch, step 5: identify peaks with consistently positive weights
-across CV folds.
+Decoder branch, step 5: identify peaks with a consistently non-zero weight
+across CV folds, in either direction.
 
-For each regulatory direction and each peak, runs a one-sided one-sample
-t-test of H0: mean(weight across folds) <= 0 vs H1: mean(weight) > 0, on the
-per-fold peak weights from step 4, then applies Benjamini-Hochberg FDR
-correction (--correction_scope per_component by default: each regulatory
-direction is its own hypothesis family; pass --correction_scope global to
-pool all direction x peak p-values into one correction instead).
+For each regulatory direction and each peak, runs a t-test on the per-fold
+peak weights from step 4 (two-sided by default -- H0: mean weight == 0,
+H1: mean weight != 0), then applies Benjamini-Hochberg FDR correction
+(--correction_scope per_component by default: each regulatory direction is
+its own hypothesis family; pass --correction_scope global to pool all
+direction x peak p-values into one correction instead).
+
+Two-sided is the default because a one-sided test only ever looks at one
+direction -- the original "greater" default here silently meant every
+peak that *decreases* along a direction was untestable by construction (a
+decreasing peak's mean is negative, so it can never clear a "greater than
+zero" bar no matter how consistent the decrease is). Peaks that open AND
+peaks that close are both real biology; --alternative greater/less remain
+available if you deliberately want a one-directional test.
+
+Output is split by sign regardless of --alternative (stable_peaks_
+<component>_up.csv/.bed for mean_weight > 0, _down for mean_weight < 0),
+not just one mixed file per component. This matters beyond bookkeeping:
+step 6 (motif enrichment) treats each stable_peaks_*.bed as one HOMER
+foreground set, and "which motifs are enriched in a set that mixes
+opening and closing peaks" is a muddled question with a muddled answer --
+splitting keeps "what's enriched in this direction's opening peaks" and
+"...closing peaks" as two clean, separately answerable questions. Under
+--alternative greater/less this split is a no-op (the unused direction's
+file is just empty), so the file-naming convention stays consistent
+regardless of which --alternative a given run used.
 
 CAVEAT -- fold non-independence: with leave-one-donor-out folds, any two
 folds share ~87.5% of their training data, so per-fold peak weights are
@@ -21,11 +41,6 @@ script also reports n_folds_positive / frac_folds_positive -- the raw
 count/fraction of folds where a peak's weight was positive, a simpler
 statistic that doesn't assume independence and is worth cross-checking
 q-value-based calls against, especially near the --fdr_threshold boundary.
-
-A one-sided test in the POSITIVE direction only identifies peaks whose
-accessibility increases along a given regulatory direction. Rerun with
---alternative less for the negative/repressed side, or --alternative
-two-sided for a non-directional stability test.
 
 USAGE:
     python 05_identify_stable_peaks.py \
@@ -51,7 +66,7 @@ def parse_args():
     p.add_argument("--fdr_threshold", type=float, default=0.05,
                     help="BH-adjusted p-value (q-value) cutoff for calling a peak stable")
     p.add_argument("--correction_scope", choices=["per_component", "global"], default="per_component")
-    p.add_argument("--alternative", choices=["greater", "less", "two-sided"], default="greater")
+    p.add_argument("--alternative", choices=["greater", "less", "two-sided"], default="two-sided")
     p.add_argument("--min_folds", type=int, default=3,
                     help="Minimum folds with data required to test a peak")
     p.add_argument("--peak_coord_regex", default=r"^(?P<chr>.+)[:\-_](?P<start>\d+)[:\-_](?P<end>\d+)$")
@@ -79,6 +94,14 @@ def one_sided_stability_test(peak_weights_per_fold: pd.DataFrame, alternative: s
             row.update({"t_stat": np.nan, "p_value": np.nan})
             rows.append(row)
             continue
+        # scipy's ttest_1samp only reports the two-sided p-value, so the
+        # one-sided ("greater"/"less") p-value has to be derived from it by
+        # hand: halve it when the sample mean already points the direction
+        # being tested (t_stat has the expected sign), or take the
+        # complement (1 - two_sided/2) when it points the other way -- a
+        # peak whose mean weight is negative can never have a small
+        # "greater" p-value, no matter how tight its distribution is,
+        # which is exactly what the `else` branch of each case enforces.
         t_stat, p_two_sided = stats.ttest_1samp(w, popmean=0.0)
         if alternative == "greater":
             p_val = p_two_sided / 2 if t_stat > 0 else 1 - p_two_sided / 2
@@ -92,6 +115,16 @@ def one_sided_stability_test(peak_weights_per_fold: pd.DataFrame, alternative: s
 
 
 def apply_bh_correction(df: pd.DataFrame, scope: str, fdr_threshold: float):
+    """
+    scope="per_component" (default) runs a separate BH correction for each
+    regulatory direction's peaks -- appropriate when "5% FDR among
+    beta_dis-associated peaks" and "5% FDR among beta_loc-associated peaks"
+    are treated as two independent scientific questions, which is the
+    normal framing for this kind of multi-direction decoder. scope="global"
+    pools every (component, peak) p-value into one correction instead --
+    more conservative, and appropriate only if you want a single "5% FDR
+    across all reported peaks, from whichever direction" guarantee.
+    """
     df = df.copy()
     df["q_value"] = np.nan
     testable = df["p_value"].notna()
@@ -141,7 +174,7 @@ def main():
               "peak weights are correlated -- the t-test below is anti-conservative. "
               "n_folds_positive/frac_folds_positive is reported as a non-parametric cross-check.")
 
-    print(f"\nRunning one-sided (alternative='{args.alternative}') t-tests...")
+    print(f"\nRunning t-tests (alternative='{args.alternative}')...")
     test_results = one_sided_stability_test(peak_weights, args.alternative, args.min_folds)
 
     n_untestable = test_results["p_value"].isna().sum()
@@ -158,17 +191,27 @@ def main():
 
     for component, sub in test_results.groupby("component"):
         stable = sub[sub["is_stable"]].sort_values("q_value")
-        print(f"  {component}: {len(stable)} / {len(sub)} peaks stable at q < {args.fdr_threshold}")
+        n_up = int((stable["mean_weight"] > 0).sum())
+        n_down = int((stable["mean_weight"] < 0).sum())
+        print(f"  {component}: {len(stable)} / {len(sub)} peaks stable at q < {args.fdr_threshold} "
+              f"({n_up} up, {n_down} down)")
 
-        comp_path = os.path.join(args.out_dir, f"stable_peaks_{component}.csv")
-        stable.to_csv(comp_path, index=False)
+        # Split by sign regardless of --alternative -- see the module
+        # docstring for why a mixed up+down foreground set would corrupt
+        # step 6's motif enrichment. Under a one-sided --alternative this
+        # is a no-op (the unused direction's files are simply empty), so
+        # the naming convention is the same either way.
+        for direction, direction_df in [("up", stable[stable["mean_weight"] > 0]),
+                                         ("down", stable[stable["mean_weight"] < 0])]:
+            comp_path = os.path.join(args.out_dir, f"stable_peaks_{component}_{direction}.csv")
+            direction_df.to_csv(comp_path, index=False)
 
-        bed_df = peak_to_bed(stable["peak"], args.peak_coord_regex)
-        bed_path = os.path.join(args.out_dir, f"stable_peaks_{component}.bed")
-        if len(bed_df) > 0:
-            bed_df[["chrom", "start", "end", "peak"]].to_csv(bed_path, sep="\t", header=False, index=False)
-        else:
-            open(bed_path, "w").close()
+            bed_df = peak_to_bed(direction_df["peak"], args.peak_coord_regex)
+            bed_path = os.path.join(args.out_dir, f"stable_peaks_{component}_{direction}.bed")
+            if len(bed_df) > 0:
+                bed_df[["chrom", "start", "end", "peak"]].to_csv(bed_path, sep="\t", header=False, index=False)
+            else:
+                open(bed_path, "w").close()
 
     print("\nDone.")
 

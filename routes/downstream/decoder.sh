@@ -40,17 +40,28 @@ RNA_ASSAY="${DECODER_RNA_ASSAY:-${decoder_rna_assay:-RNA}}"
 ATAC_ASSAY="${DECODER_ATAC_ASSAY:-${decoder_atac_assay:-auto}}"
 CONSTRAINT_MATRIX="${DECODER_CONSTRAINT_MATRIX:-configs/decoder/constraint_matrix.csv}"
 FOLD_COL="${DECODER_FOLD_COL:-${decoder_fold_col:-donor_id}}"
+# Restrict this run to specific --celltype_col / --condition_col values
+# (comma-separated), applied before pseudobulk aggregation -- a real
+# analysis subset, not a post-hoc output filter. Pair --condition_filter
+# with a --constraint_matrix scoped to exactly that condition set, e.g. a
+# within-disease Lesional-vs-NonLesional comparison decoupled from the
+# shared multi-condition model's beta_loc/beta_int pooling:
+#   DECODER_CELLTYPE_FILTER=FIB DECODER_CONDITION_FILTER=AD_L,AD_NL \
+#     DECODER_CONSTRAINT_MATRIX=configs/decoder/constraint_matrix_AD_LvsNL.csv \
+#     run/runmultiome decoder
+CELLTYPE_FILTER="${DECODER_CELLTYPE_FILTER:-}"
+CONDITION_FILTER="${DECODER_CONDITION_FILTER:-}"
 
 # Output directory encodes the actual parameter combination this run used,
-# so two runs with different schema/fold overrides land in separate,
-# non-clobbering trees instead of silently overwriting output/decoder/ --
-# what makes this branch modular across objects/schemas rather than
-# single-configuration. Set DECODER_RUN_TAG directly for a shorter,
-# hand-chosen label instead of the auto-generated one (e.g. for a run you
-# expect to reference by name later).
+# so two runs with different schema/fold/filter overrides land in
+# separate, non-clobbering trees instead of silently overwriting
+# output/decoder/ -- what makes this branch modular across objects/
+# schemas/subsets rather than single-configuration. Set DECODER_RUN_TAG
+# directly for a shorter, hand-chosen label instead of the auto-generated
+# one (e.g. for a run you expect to reference by name later).
 sanitize() { echo "$1" | tr -c 'A-Za-z0-9_.-' '_'; }
 CONSTRAINT_MATRIX_TAG="$(basename "$CONSTRAINT_MATRIX" .csv)"
-AUTO_RUN_TAG="ct-$(sanitize "$CELLTYPE_COL")_donor-$(sanitize "$DONOR_COL")_cond-$(sanitize "$CONDITION_COL")_loc-$(sanitize "$LOCATION_COL")_fold-$(sanitize "$FOLD_COL")_rna-$(sanitize "$RNA_ASSAY")_atac-$(sanitize "$ATAC_ASSAY")_cmat-$(sanitize "$CONSTRAINT_MATRIX_TAG")"
+AUTO_RUN_TAG="ct-$(sanitize "$CELLTYPE_COL")_donor-$(sanitize "$DONOR_COL")_cond-$(sanitize "$CONDITION_COL")_loc-$(sanitize "$LOCATION_COL")_fold-$(sanitize "$FOLD_COL")_rna-$(sanitize "$RNA_ASSAY")_atac-$(sanitize "$ATAC_ASSAY")_cmat-$(sanitize "$CONSTRAINT_MATRIX_TAG")_ctf-$(sanitize "${CELLTYPE_FILTER:-all}")_condf-$(sanitize "${CONDITION_FILTER:-all}")"
 RUN_TAG="${DECODER_RUN_TAG:-$AUTO_RUN_TAG}"
 
 DECODER_ROOT="output/decoder/$RUN_TAG"
@@ -68,13 +79,23 @@ Rscript scripts/downstream/decoder/01_pseudobulk_creation.R \
     --condition_col "$CONDITION_COL" \
     --location_col "$LOCATION_COL" \
     --rna_assay "$RNA_ASSAY" \
-    --atac_assay "$ATAC_ASSAY"
+    --atac_assay "$ATAC_ASSAY" \
+    --constraint_matrix "$CONSTRAINT_MATRIX" \
+    --celltype_filter "$CELLTYPE_FILTER" \
+    --condition_filter "$CONDITION_FILTER"
 
 echo "[decoder 2/6] Feature engineering (distal-peak LSI + RNA PCA)"
 Rscript scripts/downstream/decoder/02_feature_engineering.R \
     --pseudobulk_dir "$PSEUDOBULK_DIR" \
     --out_dir "$FEATURES_DIR" \
     --genome_build "${genome:-hg38}"
+
+echo "[decoder 2/6] Checking whether the first components are batch- or biology-driven"
+Rscript scripts/downstream/decoder/02b_plot_embeddings.R \
+    --pseudobulk_dir "$PSEUDOBULK_DIR" \
+    --features_dir "$FEATURES_DIR" \
+    --n_components 4 \
+    --out_dir "$DECODER_ROOT/embedding_qc"
 
 source "$personal_anaconda_path"
 conda activate "$decoder_env_name"
@@ -101,6 +122,13 @@ python scripts/downstream/decoder/04_project_to_peak_space.py \
     --cv_fold_weights "$DECODER_ROOT/decoder_atac/cv_fold_W_components.csv" \
     --final_weights "$DECODER_ROOT/decoder_atac/final_decoder_W.csv" \
     --out_dir "$DECODER_ROOT/peak_projections"
+
+echo "[decoder 4/6] Project RNA component weights to gene space"
+python scripts/downstream/decoder/07_project_to_gene_space.py \
+    --loadings "$FEATURES_DIR/rna_pca_loadings.csv" \
+    --cv_fold_weights "$DECODER_ROOT/decoder_rna/cv_fold_W_components.csv" \
+    --final_weights "$DECODER_ROOT/decoder_rna/final_decoder_W.csv" \
+    --out_dir "$DECODER_ROOT/gene_projections"
 
 echo "[decoder 5/6] Identify consistently positive (stable) peaks per direction"
 python scripts/downstream/decoder/05_identify_stable_peaks.py \

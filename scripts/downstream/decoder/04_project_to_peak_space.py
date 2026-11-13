@@ -3,22 +3,16 @@
 Decoder branch, step 4: project decoder component weights from LSI space
 back to peak space.
 
-ATAC-only step (RNA components are already in gene space via PCA loadings
--- the equivalent projection there is gene_weights = rna_pca_loadings @ W,
-no peak-specific bookkeeping needed).
-
-For each regulatory direction and each CV fold's W (step 3's
-cv_fold_W_components.csv):
-
-    peak_weight[peak, component, fold] = sum_c( loadings[peak, c] * W[component, c, fold] )
-
-i.e. peak_weights = loadings @ W.T, done per fold so step 5 can run its
-one-sided test across the resulting fold-level peak weight distributions.
+ATAC-only step. See 07_project_to_gene_space.py for the RNA-side
+equivalent (PCA loadings -> genes, gene_weights = rna_pca_loadings @ W) --
+the underlying math (loadings @ W.T) is identical between modalities, so
+it lives once in projection.py and both scripts just supply their own
+loadings matrix and item label ("peak" vs "gene").
 
 loadings (peaks x LSI components) comes from step 2's
 atac_lsi_loadings.csv -- already restricted to distal peaks with LSI dim 1
 dropped, so its columns already match W's feature axis one-to-one by name.
-This script verifies that alignment explicitly rather than assuming it.
+projection.py verifies that alignment explicitly rather than assuming it.
 
 USAGE:
     python 04_project_to_peak_space.py \
@@ -33,6 +27,8 @@ import os
 
 import pandas as pd
 
+from projection import project_fold_weights, project_final_weights
+
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -44,36 +40,6 @@ def parse_args():
                     help="Optional: final_decoder_W.csv from step 3 for a point-estimate projection")
     p.add_argument("--out_dir", required=True)
     return p.parse_args()
-
-
-def project_fold_weights(loadings: pd.DataFrame, fold_weights_long: pd.DataFrame):
-    lsi_cols_in_weights = sorted(fold_weights_long["feature"].unique())
-    lsi_cols_in_loadings = sorted(loadings.columns)
-    if lsi_cols_in_weights != lsi_cols_in_loadings:
-        only_in_weights = set(lsi_cols_in_weights) - set(lsi_cols_in_loadings)
-        only_in_loadings = set(lsi_cols_in_loadings) - set(lsi_cols_in_weights)
-        raise ValueError(
-            "LSI component names in cv_fold_weights do not match atac_lsi_loadings.csv columns "
-            "exactly. Usually means step 2's --keep_lsi_dim1 setting differed between the "
-            "loadings export and what fed the decoder, or the two files came from different runs.\n"
-            f"  In weights but not loadings: {sorted(only_in_weights)}\n"
-            f"  In loadings but not weights: {sorted(only_in_loadings)}"
-        )
-
-    results = []
-    for (fold, component), sub in fold_weights_long.groupby(["held_out_fold", "component"]):
-        w = sub.set_index("feature")["weight"].reindex(loadings.columns)
-        peak_weights = loadings.to_numpy() @ w.to_numpy()
-        results.append(pd.DataFrame({
-            "held_out_fold": fold, "component": component, "peak": loadings.index, "weight": peak_weights,
-        }))
-    return pd.concat(results, axis=0, ignore_index=True)
-
-
-def project_final_weights(loadings: pd.DataFrame, final_W: pd.DataFrame):
-    final_W = final_W[loadings.columns]
-    peak_weights = loadings.to_numpy() @ final_W.to_numpy().T
-    return pd.DataFrame(peak_weights, index=loadings.index, columns=final_W.index)
 
 
 def main():
@@ -88,7 +54,7 @@ def main():
           f"{fold_weights_long['component'].nunique()} components x "
           f"{fold_weights_long['feature'].nunique()} LSI components")
 
-    per_fold_peak_weights = project_fold_weights(loadings, fold_weights_long)
+    per_fold_peak_weights = project_fold_weights(loadings, fold_weights_long, item_label="peak")
     out_path = os.path.join(args.out_dir, "peak_weights_per_fold.csv")
     per_fold_peak_weights.to_csv(out_path, index=False)
     print(f"Written: {out_path} ({len(per_fold_peak_weights)} rows)")
