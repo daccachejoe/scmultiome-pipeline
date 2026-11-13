@@ -127,9 +127,17 @@ in `config/pipeline.config` to point at your install.
 ```
 conda create -n decoder-env python=3.11
 conda activate decoder-env
-uv pip install -e ".[decoder]"
+uv pip install -e ".[decoder]" --extra-index-url https://download.pytorch.org/whl/cpu
 uv lock   # produces a real uv.lock for this environment
 ```
+
+The `--extra-index-url .../cpu` matters: without it, `torch` defaults to a
+CUDA build (multi-GB download, needs a GPU node/CUDA module). The decoder
+is a small full-batch LBFGS fit with no benefit from GPU, so the CPU-only
+wheel is both sufficient and much faster to install. If `uv` isn't
+installed, plain `pip install -e ".[decoder]" --extra-index-url
+https://download.pytorch.org/whl/cpu` works the same way (just skip the
+`uv lock` step, which is uv-specific).
 
 `scripts/downstream/decoder/06_run_motif_enrichment.py` additionally wraps
 HOMER's `findMotifsGenome.pl` (see `decoder_homer_script` in

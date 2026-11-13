@@ -45,3 +45,15 @@ demux = [
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+# This pyproject.toml exists only to declare the optional-dependency
+# groups above -- there's no actual importable Python package here
+# (scripts/downstream/*.py are run directly, never `import`ed). Without
+# this, setuptools' automatic package discovery sees run/, data/,
+# output/, config/, routes/, configs/ all sitting at the top level and
+# refuses to guess which one is "the package": "Multiple top-level
+# packages discovered in a flat-layout". Declaring packages = [] tells it
+# there's nothing to discover, so `pip install -e ".[ucd/scenicplus/
+# decoder]"` installs just the dependency list as intended.
+[tool.setuptools]
+packages = []
