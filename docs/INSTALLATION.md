@@ -38,10 +38,15 @@ module load <your R module>   # e.g. r/4.1.2 or R/4.2.0
 Rscript install_r_packages.R
 ```
 
-This pins Seurat v4 (`Seurat 4.4.0`, `SeuratObject 4.1.4`) deliberately --
-Seurat v5 changes APIs this pipeline relies on. `install_r_packages.R`
-documents every package; regenerate a real, hash-verified lockfile for your
-environment once it's built:
+The pipeline runs on **Seurat 5.1.0 / SeuratObject 5.0.2 / Signac 1.14.0**
+(R 4.2.0, Bioconductor 3.16) -- the Minerva `R/4.2.0` library it was developed
+and tested on. (Older versions of this document pinned Seurat 4.4.0; that is
+not what the pipeline has been running on.) The exact library, all ~300
+packages, is recorded as an `renv.lock` in the Nextflow port
+(`scmultiome-nf`, `containers/r-trunk/renv.lock`), whose container image is the
+easiest way to get an identical environment. To build one by hand instead,
+`install_r_packages.R` lists the top-level packages; regenerate a real,
+hash-verified lockfile for your environment once it's built:
 
 ```r
 install.packages("renv")

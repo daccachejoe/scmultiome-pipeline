@@ -3,7 +3,8 @@
 # Rscript scripts/03_convert_seurat_to_h5ad.R arg1 arg2 arg3
 # args1 = object to convert to h5ad format
 # args2 = output file name
-# args3 = conda env name
+# args3 = conda env name (optional: omit it to use RETICULATE_PYTHON / the
+#         default Python, e.g. inside the scmultiome-nf container)
 
 # only export is used right now, better to export meta data in csv file
 source("scripts/lib/config.R")
@@ -15,7 +16,9 @@ args = commandArgs(trailingOnly=TRUE)
 
 library(sceasy)
 library(reticulate)
-use_condaenv(args[[3]])
+if (length(args) >= 3 && nzchar(args[[3]])) {
+    use_condaenv(args[[3]])
+}
 library(Seurat)
 library(Signac)
 source("scripts/lib/seurat_io.R")
