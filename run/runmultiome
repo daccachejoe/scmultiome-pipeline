@@ -27,6 +27,8 @@ exploratory/heavyweight extras):
   decoder                (extra environment required) constrained decoder: pseudobulk ->
                           LSI/PCA -> CV-fit decoder -> peak projection -> stability -> motif enrichment
   decoder_self_test      synthetic end-to-end check of the decoder branch (no real data needed)
+  archr_peaks            ArchR reproducible peaks per cell group (pseudo-replicates, MACS2),
+                          added as a new peak assay; grouping via ARCHR_* / archr_* keys
 
 Run per-sample stages, then review outputs in output/, before moving to
 the next stage. See README.md for the full walkthrough.
@@ -176,6 +178,11 @@ decoder() {
 decoder_self_test() {
     echo "Downstream branch: decoder synthetic end-to-end self-test"
     submit_job routes/downstream/decoder_self_test.sh scripts/outs/decoder-self-test-%J.out 0:30 4000 2
+}
+
+archr_peaks() {
+    echo "Downstream branch: ArchR reproducible peak calling"
+    submit_job routes/downstream/archr_peaks.sh scripts/outs/archr-peaks-%J.out 24:00 12000 8
 }
 
 run_multiome() {

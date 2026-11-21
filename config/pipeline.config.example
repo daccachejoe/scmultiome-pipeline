@@ -114,3 +114,22 @@ decoder_atac_assay=peaks
 decoder_fold_col=donor_id
 # HOMER findMotifsGenome.pl on $PATH, or a full path to it
 decoder_homer_script=findMotifsGenome.pl
+
+# ---- ArchR peaks (downstream branch, run/runmultiome archr_peaks) ----
+# Peaks are called per group_col value (x split_col value, e.g. timepoint, if set).
+# Groups under archr_min_group cells are pooled across splits, then left out of
+# calling if still too small (they still get counts).
+archr_group_col=ct.spec
+archr_split_col=
+# pseudo-replicate = these columns pasted together; use orig.ident,donor when
+# libraries pool several donors
+archr_rep_cols=orig.ident
+archr_min_group=50
+# name of the new assay holding the ArchR peak counts
+archr_assay_name=peaks_archr
+# blank = the cores the job was given
+archr_threads=
+# MACS2 for ArchR: loaded only inside scripts/downstream/archr/macs2-wrapper.sh
+# (loading it in the R job breaks Rcpp). archr_macs2_path, if set, is used instead.
+archr_macs2_module=macs/2.1.0
+archr_macs2_path=

@@ -42,5 +42,7 @@ install.packages(c(
 ))
 
 remotes::install_github("immunogenomics/harmony")
+# ArchR (downstream branch archr_peaks); 1.0.2 is what the Minerva R/4.2.0 library has
+remotes::install_github("GreenleafLab/ArchR", ref = "v1.0.2", repos = BiocManager::repositories(), upgrade = "never")
 
 # argparser is vendored at .lib/argparser -- installed by routes/00_install.sh

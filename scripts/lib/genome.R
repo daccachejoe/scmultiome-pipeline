@@ -13,7 +13,8 @@ load_species_genome <- function() {
       ensdb = EnsDb.Mmusculus.v79::EnsDb.Mmusculus.v79,
       genome = BSgenome.Mmusculus.UCSC.mm10::BSgenome.Mmusculus.UCSC.mm10,
       blacklist = Signac::blacklist_mm10,
-      jaspar_taxid = 10090
+      jaspar_taxid = 10090,
+      archr_genome = "mm10"   # ArchR::addArchRGenome() name
     )
   } else {
     library(EnsDb.Hsapiens.v86, quietly = TRUE)
@@ -23,7 +24,8 @@ load_species_genome <- function() {
       ensdb = EnsDb.Hsapiens.v86::EnsDb.Hsapiens.v86,
       genome = BSgenome.Hsapiens.UCSC.hg38::BSgenome.Hsapiens.UCSC.hg38,
       blacklist = Signac::blacklist_hg38_unified,
-      jaspar_taxid = 9606
+      jaspar_taxid = 9606,
+      archr_genome = "hg38"   # ArchR::addArchRGenome() name
     )
   }
 }

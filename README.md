@@ -52,6 +52,7 @@ step in multiome analysis, not something most users would skip.
 | `run_scenicplus` (extra environments required) | SCENIC+ regulon inference | `routes/downstream/run_scenicplus.sh` | `scripts/downstream/export_scenicplus_data.R`, `reformat_anndata.py`, `scenicplus_pipeline.py` |
 | `decoder` (extra environment required) | Constrained multinomial logistic regression decoder: pseudobulk -> distal-peak LSI / RNA PCA -> CV-fit decoder -> peak-space projection -> stable-peak identification -> motif enrichment | `routes/downstream/decoder.sh` | `scripts/downstream/decoder/*` |
 | `decoder_self_test` | Synthetic end-to-end check of the decoder branch (no real/demultiplexed data needed) | `routes/downstream/decoder_self_test.sh` | `scripts/downstream/decoder/self_test_e2e.py` |
+| `archr_peaks` | ArchR reproducible peaks per cell group (x optional split, e.g. timepoint), with pseudo-replicates (e.g. library x donor) and MACS2; adds a `peaks_archr` assay. Output: `output/archr/<run_tag>/`, `output/RDS-files/{prefix}-archr-<run_tag>-obj-list.RDS`. Grouping via `ARCHR_GROUP_COL` / `ARCHR_SPLIT_COL` / `ARCHR_REP_COLS` or the `archr_*` config keys | `routes/downstream/archr_peaks.sh` | `scripts/downstream/archr/01_export_cells.R`, `02_call_peaks.R`, `03_add_peak_assay.R` |
 
 These are exploratory or heavyweight extras (a closer look at a specific
 lineage, a separate regulon-inference toolchain, or a separate
@@ -174,7 +175,8 @@ shorter, hand-chosen directory name instead of the auto-generated one.
 │       ├── subcluster.sh
 │       ├── run_scenicplus.sh      # extra environments required
 │       ├── decoder.sh             # extra environment required
-│       └── decoder_self_test.sh
+│       ├── decoder_self_test.sh
+│       └── archr_peaks.sh
 ├── scripts/                       # R/Python analysis code
 │   ├── seurat_signac_pipeline.R   # engine: arg parsing + config/species setup + dispatch
 │   ├── functions.R                # shared Seurat/Signac wrapper functions
@@ -187,6 +189,7 @@ shorter, hand-chosen directory name instead of the auto-generated one.
 │   │   └── decoder/                # pseudobulk -> features -> CV decoder -> peak projection
 │   │                               #   -> stable peaks -> motif enrichment (see README's
 │   │                               #   "Decoder methodology & caveats")
+│   │   └── archr/                  # ArchR peaks: export cells -> call peaks -> add assay
 │   └── lib/                       # shared R helpers (config.R, genome.R, seurat_io.R, demux.R)
 ├── config/                        # pipeline MACHINERY config -- edit once
 │   ├── pipeline.config.example    # tracked template
